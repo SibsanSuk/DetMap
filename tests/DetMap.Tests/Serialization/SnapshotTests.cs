@@ -15,9 +15,9 @@ public class SnapshotTests
         var map = new DetMap.Core.DetMap(16, 16);
 
         // layers of every kind
-        var byteLayer = map.Grid.CreateLayer("flags",    LayerType.Byte);
-        var intLayer  = map.Grid.CreateLayer("ids",      LayerType.Int);
-        var f64Layer  = map.Grid.CreateLayer("height",   LayerType.Fix64);
+        var byteLayer = map.Grid.CreateLayer("flags",    DetType.Byte);
+        var intLayer  = map.Grid.CreateLayer("ids",      DetType.Int);
+        var f64Layer  = map.Grid.CreateLayer("height",   DetType.Fix64);
         var bitLayer  = map.Grid.CreateBitLayer("walkable");
         var entities  = map.Grid.CreateEntityMap("units");
         var tags      = map.Grid.CreateTagMap("services");
@@ -40,10 +40,10 @@ public class SnapshotTests
 
         // table with every col kind
         var chars   = map.CreateTable("heroes");
-        var nameCol = chars.AddStringCol("name");
-        var hpCol   = chars.AddCol<int>("hp");
-        var lvlCol  = chars.AddCol<byte>("level");
-        var xpCol   = chars.AddCol<Fix64>("xp");
+        var nameCol = chars.CreateStringCol("name");
+        var hpCol   = chars.CreateCol("hp", DetType.Int);
+        var lvlCol  = chars.CreateCol("level", DetType.Byte);
+        var xpCol   = chars.CreateCol("xp", DetType.Fix64);
 
         int id0 = chars.Spawn();
         nameCol.Set(id0, "Alice");

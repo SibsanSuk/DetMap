@@ -10,7 +10,7 @@ public class BuildingPlacerTests
     private static (DetGrid grid, DetLayer<int> bldg, DetBitLayer walkable) MakeGrid(int w = 16, int h = 16)
     {
         var grid = new DetGrid(w, h);
-        var bldg = grid.CreateLayer("building", LayerType.Int);
+        var bldg = grid.CreateLayer("building", DetType.Int);
         var walkable = grid.CreateBitLayer("walkable");
         walkable.SetAll(true);
         return (grid, bldg, walkable);

@@ -94,8 +94,8 @@ using DetMap.Tables;
 var map = new DetMap.Core.DetMap(64, 64);
 
 // 2. Create layers
-var building  = map.Grid.CreateLayer("building",  LayerType.Int);
-var height    = map.Grid.CreateLayer("height",    LayerType.Fix64);
+var building  = map.Grid.CreateLayer("building",  DetType.Int);
+var height    = map.Grid.CreateLayer("height",    DetType.Fix64);
 var walkable  = map.Grid.CreateBitLayer("walkable");
 var units     = map.Grid.CreateEntityMap("units");
 var services  = map.Grid.CreateTagMap("services");
@@ -108,9 +108,9 @@ map.SetGlobal("population", Fix64.FromInt(0));
 
 // 4. Create entity table
 var chars   = map.CreateTable("characters");
-var nameCol = chars.AddStringCol("name");
-var jobCol  = chars.AddCol<byte>("job");
-var hpCol   = chars.AddCol<int>("hp");
+var nameCol = chars.CreateStringCol("name");
+var jobCol  = chars.CreateCol("job", DetType.Byte);
+var hpCol   = chars.CreateCol("hp", DetType.Int);
 
 // 5. Place a building
 var houseDef = new BuildingDef("house", 2, 2, Fix64.FromInt(1));
@@ -150,10 +150,10 @@ All layers are registered by name on the grid. Each has a `DirtyRect` that track
 Backed by a flat array `T[width * height]`. Supported element types: `byte`, `int`, `Fix64`.
 
 ```csharp
-// Creation — LayerType token enforces compile-time determinism
-DetLayer<byte>  flags  = map.Grid.CreateLayer("flags",  LayerType.Byte);
-DetLayer<int>   ids    = map.Grid.CreateLayer("ids",    LayerType.Int);
-DetLayer<Fix64> height = map.Grid.CreateLayer("height", LayerType.Fix64);
+// Creation — DetType token enforces compile-time determinism
+DetLayer<byte>  flags  = map.Grid.CreateLayer("flags",  DetType.Byte);
+DetLayer<int>   ids    = map.Grid.CreateLayer("ids",    DetType.Int);
+DetLayer<Fix64> height = map.Grid.CreateLayer("height", DetType.Fix64);
 
 // Read / Write
 flags.Set(3, 4, 42);
@@ -292,10 +292,10 @@ Tables are column-oriented entity stores — think of each row as an entity, eac
 DetTable chars = map.CreateTable("characters");
 
 // Add columns before spawning entities
-DetStringCol nameCol = chars.AddStringCol("name");
-DetCol<byte> jobCol  = chars.AddCol<byte>("job");
-DetCol<int>  hpCol   = chars.AddCol<int>("hp");
-DetCol<Fix64> xpCol  = chars.AddCol<Fix64>("xp");
+DetStringCol nameCol = chars.CreateStringCol("name");
+DetCol<byte> jobCol  = chars.CreateCol("job", DetType.Byte);
+DetCol<int>  hpCol   = chars.CreateCol("hp", DetType.Int);
+DetCol<Fix64> xpCol  = chars.CreateCol("xp", DetType.Fix64);
 
 // Spawn entity — returns next available ID (recycles despawned IDs, LIFO)
 int id = chars.Spawn();             // 0
@@ -571,15 +571,15 @@ void Awake()
 {
     _map = new DetMap.Core.DetMap(64, 64);
 
-    _buildingLayer = _map.Grid.CreateLayer("building", LayerType.Int);
+    _buildingLayer = _map.Grid.CreateLayer("building", DetType.Int);
     _walkable      = _map.Grid.CreateBitLayer("walkable");
     _units         = _map.Grid.CreateEntityMap("units");
 
     _walkable.SetAll(true);
 
     _table   = _map.CreateTable("units");
-    _nameCol = _table.AddStringCol("name");
-    _hpCol   = _table.AddCol<int>("hp");
+    _nameCol = _table.CreateStringCol("name");
+    _hpCol   = _table.CreateCol("hp", DetType.Int);
 
     _pathfinder = new DetPathfinder(64, 64);
     _pathCols   = new DetPathCol(256);
@@ -703,8 +703,8 @@ DetFlowField.Blocked = 255
 int  table.Spawn()
 void table.Despawn(int id)
 bool table.IsAlive(int id)
-DetCol<T>    table.AddCol<T>(string name)
-DetStringCol table.AddStringCol(string name)
+DetCol<T>    table.CreateCol<T>(string name, DetType<T> type)  // T = byte | int | Fix64
+DetStringCol table.CreateStringCol(string name)
 DetCol<T>    table.GetCol<T>(string name)
 DetStringCol table.GetStringCol(string name)
 IEnumerable<int> table.GetAlive()        // 0..HighWater, alive only

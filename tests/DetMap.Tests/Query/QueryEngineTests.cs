@@ -30,7 +30,7 @@ public class QueryEngineTests
     public void RectQuery_WithPredicate_FiltersCorrectly()
     {
         var grid = MakeGrid(8, 8);
-        var layer = grid.CreateLayer("val", LayerType.Int);
+        var layer = grid.CreateLayer("val", DetType.Int);
         layer.Set(2, 2, 1);
         layer.Set(3, 3, 1);
 

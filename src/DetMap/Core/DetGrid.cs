@@ -15,8 +15,8 @@ public sealed class DetGrid
         Height = height;
     }
 
-    /// <param name="type">Use <see cref="LayerType.Byte"/>, <see cref="LayerType.Int"/>, or <see cref="LayerType.Fix64"/>.</param>
-    public DetLayer<T> CreateLayer<T>(string name, LayerType<T> type, T defaultValue = default)
+    /// <param name="type">Use <see cref="DetType.Byte"/>, <see cref="DetType.Int"/>, or <see cref="DetType.Fix64"/>.</param>
+    public DetLayer<T> CreateLayer<T>(string name, DetType<T> type, T defaultValue = default)
         where T : unmanaged
     {
         var layer = new DetLayer<T>(name, Width, Height, defaultValue);

@@ -1,3 +1,5 @@
+using DetMap.Core;
+
 namespace DetMap.Tables;
 
 public sealed class DetTable
@@ -31,7 +33,8 @@ public sealed class DetTable
 
     public bool IsAlive(int id) => _alive.Get(id) == 1;
 
-    public DetCol<T> AddCol<T>(string name) where T : unmanaged
+    /// <param name="type">Use <see cref="DetType.Byte"/>, <see cref="DetType.Int"/>, or <see cref="DetType.Fix64"/>.</param>
+    public DetCol<T> CreateCol<T>(string name, DetType<T> type) where T : unmanaged
     {
         var col = new DetCol<T>(Math.Max(_highWater, 64));
         _cols[name] = col;
@@ -39,7 +42,7 @@ public sealed class DetTable
         return col;
     }
 
-    public DetStringCol AddStringCol(string name)
+    public DetStringCol CreateStringCol(string name)
     {
         var col = new DetStringCol(Math.Max(_highWater, 64));
         _cols[name] = col;
@@ -47,8 +50,8 @@ public sealed class DetTable
         return col;
     }
 
-    public DetCol<T> GetCol<T>(string name) where T : unmanaged => (DetCol<T>)_cols[name];
-    public DetStringCol GetStringCol(string name) => (DetStringCol)_cols[name];
+    public DetCol<T>    GetCol<T>(string name)      where T : unmanaged => (DetCol<T>)_cols[name];
+    public DetStringCol GetStringCol(string name)   => (DetStringCol)_cols[name];
 
     /// <summary>Iterate alive entities in deterministic order (0..highWater).</summary>
     public IEnumerable<int> GetAlive()

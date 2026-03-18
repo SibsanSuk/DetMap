@@ -35,7 +35,7 @@ public class DetGridTests
     public void CreateLayer_RetrievedByName()
     {
         var grid = new DetGrid(8, 8);
-        var layer = grid.CreateLayer("building", LayerType.Int);
+        var layer = grid.CreateLayer("building", DetType.Int);
         var retrieved = grid.Layer<int>("building");
         Assert.Same(layer, retrieved);
     }
@@ -80,7 +80,7 @@ public class DetGridTests
     public void AllLayers_ContainsAllCreated()
     {
         var grid = new DetGrid(8, 8);
-        grid.CreateLayer("building", LayerType.Int);
+        grid.CreateLayer("building", DetType.Int);
         grid.CreateBitLayer("walkable");
         grid.CreateEntityMap("units");
         Assert.Equal(3, grid.AllLayers.Count);

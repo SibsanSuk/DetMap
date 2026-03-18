@@ -1,3 +1,4 @@
+using DetMap.Core;
 using DetMap.Tables;
 
 namespace DetMap.Tests.Tables;
@@ -45,7 +46,7 @@ public class DetTableTests
     public void Column_SetGet_RoundTrips()
     {
         var table = new DetTable("chars");
-        var jobCol = table.AddCol<byte>("job");
+        var jobCol = table.CreateCol("job", DetType.Byte);
         int id = table.Spawn();
         jobCol.Set(id, 3);
         Assert.Equal(3, jobCol.Get(id));
@@ -55,7 +56,7 @@ public class DetTableTests
     public void StringColumn_SetGet_RoundTrips()
     {
         var table = new DetTable("chars");
-        var nameCol = table.AddStringCol("name");
+        var nameCol = table.CreateStringCol("name");
         int id = table.Spawn();
         nameCol.Set(id, "Somchai");
         Assert.Equal("Somchai", nameCol.Get(id));
@@ -91,7 +92,7 @@ public class DetTableTests
     public void GetCol_RetrievesColumnByName()
     {
         var table = new DetTable("chars");
-        var added = table.AddCol<byte>("job");
+        var added = table.CreateCol("job", DetType.Byte);
         var retrieved = table.GetCol<byte>("job");
         int id = table.Spawn();
         retrieved.Set(id, 7);
@@ -102,7 +103,7 @@ public class DetTableTests
     public void GetStringCol_RetrievesColumnByName()
     {
         var table = new DetTable("chars");
-        var added = table.AddStringCol("name");
+        var added = table.CreateStringCol("name");
         var retrieved = table.GetStringCol("name");
         int id = table.Spawn();
         retrieved.Set(id, "Test");

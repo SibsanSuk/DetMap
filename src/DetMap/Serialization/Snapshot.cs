@@ -156,9 +156,9 @@ public static class Snapshot
     private static IDetLayer CreateLayer(DetMap.Core.DetMap map, DetLayerKind kind, string name)
         => kind switch
         {
-            DetLayerKind.LayerByte  => map.Grid.CreateLayer(name, LayerType.Byte),
-            DetLayerKind.LayerInt   => map.Grid.CreateLayer(name, LayerType.Int),
-            DetLayerKind.LayerFix64 => map.Grid.CreateLayer(name, LayerType.Fix64),
+            DetLayerKind.LayerByte  => map.Grid.CreateLayer(name, DetType.Byte),
+            DetLayerKind.LayerInt   => map.Grid.CreateLayer(name, DetType.Int),
+            DetLayerKind.LayerFix64 => map.Grid.CreateLayer(name, DetType.Fix64),
             DetLayerKind.BitLayer   => map.Grid.CreateBitLayer(name),
             DetLayerKind.EntityMap  => map.Grid.CreateEntityMap(name),
             DetLayerKind.TagMap     => map.Grid.CreateTagMap(name),
@@ -170,10 +170,10 @@ public static class Snapshot
     {
         switch (kind)
         {
-            case DetColKind.Byte:   table.AddCol<byte>(colName);   break;
-            case DetColKind.Int:    table.AddCol<int>(colName);    break;
-            case DetColKind.Fix64:  table.AddCol<Fix64>(colName);  break;
-            case DetColKind.String: table.AddStringCol(colName);   break;
+            case DetColKind.Byte:   table.CreateCol(colName, DetType.Byte);   break;
+            case DetColKind.Int:    table.CreateCol(colName, DetType.Int);    break;
+            case DetColKind.Fix64:  table.CreateCol(colName, DetType.Fix64);  break;
+            case DetColKind.String: table.CreateStringCol(colName);           break;
             default: throw new InvalidDataException($"Unknown col kind: {(byte)kind}");
         }
     }
