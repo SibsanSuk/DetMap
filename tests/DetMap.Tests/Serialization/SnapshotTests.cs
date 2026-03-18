@@ -45,19 +45,19 @@ public class SnapshotTests
         var lvlCol  = chars.CreateCol("level", DetType.Byte);
         var xpCol   = chars.CreateCol("xp", DetType.Fix64);
 
-        int id0 = chars.Spawn();
+        int id0 = chars.Insert();
         nameCol.Set(id0, "Alice");
         hpCol.Set(id0, 100);
         lvlCol.Set(id0, 5);
         xpCol.Set(id0, Fix64.FromInt(1234));
 
-        int id1 = chars.Spawn();
+        int id1 = chars.Insert();
         nameCol.Set(id1, "Bob");
         hpCol.Set(id1, 80);
         lvlCol.Set(id1, 3);
         xpCol.Set(id1, Fix64.FromInt(500));
 
-        chars.Despawn(id0); // creates a free-list entry
+        chars.Delete(id0); // creates a free-list entry
 
         // advance tick
         map.AdvanceTick();
@@ -186,8 +186,8 @@ public class SnapshotTests
         var map2 = DetMap.Core.DetMap.FromBytes(map.ToBytes());
         var t1 = map.Table("heroes");
         var t2 = map2.Table("heroes");
-        Assert.Equal(t1.IsAlive(0), t2.IsAlive(0)); // false (despawned)
-        Assert.Equal(t1.IsAlive(1), t2.IsAlive(1)); // true
+        Assert.Equal(t1.Exists(0), t2.Exists(0)); // false (despawned)
+        Assert.Equal(t1.Exists(1), t2.Exists(1)); // true
     }
 
     [Fact]
@@ -195,8 +195,8 @@ public class SnapshotTests
     {
         var map = BuildFullMap();
         var map2 = DetMap.Core.DetMap.FromBytes(map.ToBytes());
-        // id0 was despawned → next Spawn() should recycle it
-        int newId = map2.Table("heroes").Spawn();
+        // id0 was despawned → next Insert() should recycle it
+        int newId = map2.Table("heroes").Insert();
         Assert.Equal(0, newId);
     }
 

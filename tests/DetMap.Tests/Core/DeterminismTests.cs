@@ -53,7 +53,7 @@ public class DeterminismTests
         // Spawn entities
         for (int i = 0; i < 8; i++)
         {
-            int id = chars.Spawn();
+            int id = chars.Insert();
             nameCol.Set(id, $"Unit{i}");
             jobCol.Set(id, (byte)(i % 3));
             units.Add(id, i * 2, i % 4);
@@ -73,7 +73,7 @@ public class DeterminismTests
 
             for (int id = 0; id < 8; id++)
             {
-                if (!chars.IsAlive(id)) continue;
+                if (!chars.Exists(id)) continue;
                 ref DetPath p = ref pathCol.Get(id);
                 if (!p.IsValid || p.IsComplete) continue;
                 p.Advance();

@@ -18,20 +18,20 @@ public sealed class DetTable
         _alive = new DetCol<byte>(capacity);
     }
 
-    public int Spawn()
+    public int Insert()
     {
         int id = _freeList.Count > 0 ? _freeList.Pop() : _highWater++;
         _alive.Set(id, 1);
         return id;
     }
 
-    public void Despawn(int id)
+    public void Delete(int id)
     {
         _alive.Set(id, 0);
         _freeList.Push(id);
     }
 
-    public bool IsAlive(int id) => _alive.Get(id) == 1;
+    public bool Exists(int id) => _alive.Get(id) == 1;
 
     /// <param name="type">Use <see cref="DetType.Byte"/>, <see cref="DetType.Int"/>, or <see cref="DetType.Fix64"/>.</param>
     public DetCol<T> CreateCol<T>(string name, DetType<T> type) where T : unmanaged

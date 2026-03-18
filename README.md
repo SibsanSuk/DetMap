@@ -117,7 +117,7 @@ var houseDef = new BuildingDef("house", 2, 2, Fix64.FromInt(1));
 BuildingPlacer.Place(map.Grid, 10, 10, houseDef, building, walkable);
 
 // 6. Spawn entities
-int id = chars.Spawn();
+int id = chars.Insert();
 nameCol.Set(id, "Alice");
 jobCol.Set(id, 0);
 hpCol.Set(id, 100);
@@ -211,7 +211,7 @@ DetBitLayer w = map.Grid.Structure<DetBitLayer>("walkable");
 
 ### DetEntityMap — spatial entity index
 
-Zero-allocation flat-array linked list. Maps entity IDs to grid cells. Supports multiple entities per cell. Entity IDs are assigned by `DetTable.Spawn()`.
+Zero-allocation flat-array linked list. Maps entity IDs to grid cells. Supports multiple entities per cell. Entity IDs are assigned by `DetTable.Insert()`.
 
 ```csharp
 DetEntityMap units = map.Grid.CreateEntityMap("units");
@@ -298,22 +298,22 @@ DetCol<int>  hpCol   = chars.CreateCol("hp", DetType.Int);
 DetCol<Fix64> xpCol  = chars.CreateCol("xp", DetType.Fix64);
 
 // Spawn entity — returns next available ID (recycles despawned IDs, LIFO)
-int id = chars.Spawn();             // 0
+int id = chars.Insert();             // 0
 nameCol.Set(id, "Alice");
 jobCol.Set(id, 1);
 hpCol.Set(id, 100);
 xpCol.Set(id, Fix64.FromInt(0));
 
-int id2 = chars.Spawn();            // 1
+int id2 = chars.Insert();            // 1
 nameCol.Set(id2, "Bob");
 
 // Despawn — frees ID for reuse
-chars.Despawn(id);                  // id 0 goes into free list
+chars.Delete(id);                  // id 0 goes into free list
 
-int recycled = chars.Spawn();       // 0  (recycled — LIFO)
+int recycled = chars.Insert();       // 0  (recycled — LIFO)
 
 // Query
-bool alive = chars.IsAlive(0);      // true (recycled)
+bool alive = chars.Exists(0);      // true (recycled)
 int  hw    = chars.HighWater;       // 2 (max ID ever assigned + 1)
 
 // Iterate all alive entities in deterministic order (0..HighWater)
@@ -700,9 +700,9 @@ DetFlowField.Blocked = 255
 ### DetTable
 
 ```csharp
-int  table.Spawn()
-void table.Despawn(int id)
-bool table.IsAlive(int id)
+int  table.Insert()
+void table.Delete(int id)
+bool table.Exists(int id)
 DetCol<T>    table.CreateCol<T>(string name, DetType<T> type)  // T = byte | int | Fix64
 DetStringCol table.CreateStringCol(string name)
 DetCol<T>    table.GetCol<T>(string name)

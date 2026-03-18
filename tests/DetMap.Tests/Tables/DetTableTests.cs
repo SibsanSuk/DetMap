@@ -9,8 +9,8 @@ public class DetTableTests
     public void Spawn_ReturnsSequentialIds()
     {
         var table = new DetTable("chars");
-        int id0 = table.Spawn();
-        int id1 = table.Spawn();
+        int id0 = table.Insert();
+        int id1 = table.Insert();
         Assert.Equal(0, id0);
         Assert.Equal(1, id1);
     }
@@ -19,9 +19,9 @@ public class DetTableTests
     public void Despawn_RecyclesId()
     {
         var table = new DetTable("chars");
-        int id = table.Spawn();
-        table.Despawn(id);
-        int recycled = table.Spawn();
+        int id = table.Insert();
+        table.Delete(id);
+        int recycled = table.Insert();
         Assert.Equal(id, recycled);
     }
 
@@ -29,17 +29,17 @@ public class DetTableTests
     public void IsAlive_AfterSpawn_IsTrue()
     {
         var table = new DetTable("chars");
-        int id = table.Spawn();
-        Assert.True(table.IsAlive(id));
+        int id = table.Insert();
+        Assert.True(table.Exists(id));
     }
 
     [Fact]
     public void IsAlive_AfterDespawn_IsFalse()
     {
         var table = new DetTable("chars");
-        int id = table.Spawn();
-        table.Despawn(id);
-        Assert.False(table.IsAlive(id));
+        int id = table.Insert();
+        table.Delete(id);
+        Assert.False(table.Exists(id));
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public class DetTableTests
     {
         var table = new DetTable("chars");
         var jobCol = table.CreateCol("job", DetType.Byte);
-        int id = table.Spawn();
+        int id = table.Insert();
         jobCol.Set(id, 3);
         Assert.Equal(3, jobCol.Get(id));
     }
@@ -57,7 +57,7 @@ public class DetTableTests
     {
         var table = new DetTable("chars");
         var nameCol = table.CreateStringCol("name");
-        int id = table.Spawn();
+        int id = table.Insert();
         nameCol.Set(id, "Somchai");
         Assert.Equal("Somchai", nameCol.Get(id));
     }
@@ -66,10 +66,10 @@ public class DetTableTests
     public void GetAlive_IteratesInDeterministicOrder()
     {
         var table = new DetTable("chars");
-        int a = table.Spawn();
-        int b = table.Spawn();
-        int c = table.Spawn();
-        table.Despawn(b);
+        int a = table.Insert();
+        int b = table.Insert();
+        int c = table.Insert();
+        table.Delete(b);
 
         var alive = table.GetAlive().ToList();
         Assert.Equal(new[] { a, c }, alive);
@@ -79,13 +79,13 @@ public class DetTableTests
     public void FreeList_LIFO_EnsuresDeterministicRecycle()
     {
         var table = new DetTable("chars");
-        int a = table.Spawn();
-        int b = table.Spawn();
-        table.Despawn(a);
-        table.Despawn(b);
+        int a = table.Insert();
+        int b = table.Insert();
+        table.Delete(a);
+        table.Delete(b);
         // LIFO: b despawned last → b recycled first
-        Assert.Equal(b, table.Spawn());
-        Assert.Equal(a, table.Spawn());
+        Assert.Equal(b, table.Insert());
+        Assert.Equal(a, table.Insert());
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public class DetTableTests
         var table = new DetTable("chars");
         var added = table.CreateCol("job", DetType.Byte);
         var retrieved = table.GetCol<byte>("job");
-        int id = table.Spawn();
+        int id = table.Insert();
         retrieved.Set(id, 7);
         Assert.Equal(7, added.Get(id));
     }
@@ -105,7 +105,7 @@ public class DetTableTests
         var table = new DetTable("chars");
         var added = table.CreateStringCol("name");
         var retrieved = table.GetStringCol("name");
-        int id = table.Spawn();
+        int id = table.Insert();
         retrieved.Set(id, "Test");
         Assert.Equal("Test", added.Get(id));
     }
@@ -114,9 +114,9 @@ public class DetTableTests
     public void HighWater_TracksMaxIdAllocated()
     {
         var table = new DetTable("chars");
-        table.Spawn();
-        table.Spawn();
-        table.Spawn();
+        table.Insert();
+        table.Insert();
+        table.Insert();
         Assert.Equal(3, table.HighWater);
     }
 
@@ -124,8 +124,8 @@ public class DetTableTests
     public void HighWater_DoesNotDecreaseOnDespawn()
     {
         var table = new DetTable("chars");
-        int id = table.Spawn();
-        table.Despawn(id);
+        int id = table.Insert();
+        table.Delete(id);
         Assert.Equal(1, table.HighWater);
     }
 

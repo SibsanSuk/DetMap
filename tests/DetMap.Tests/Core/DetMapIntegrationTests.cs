@@ -29,7 +29,7 @@ public class DetMapIntegrationTests
         Assert.Equal(Fix64.FromInt(1000), map.GetGlobal("treasury"));
 
         // Spawn
-        int somchai = chars.Spawn();
+        int somchai = chars.Insert();
         nameCol.Set(somchai, "Somchai");
         jobCol.Set(somchai, 1);
         units.Add(somchai, 10, 10);
