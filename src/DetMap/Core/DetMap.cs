@@ -1,4 +1,5 @@
 using DetMath;
+using DetMap.Pathfinding;
 using DetMap.Serialization;
 using DetMap.Tables;
 
@@ -11,6 +12,7 @@ public sealed class DetMap
 
     private readonly Dictionary<string, Fix64> _globals = new();
     private readonly Dictionary<string, DetTable> _tables = new();
+    private readonly Dictionary<string, DetPathStore> _pathStores = new();
 
     public DetMap(int width, int height)
     {
@@ -35,8 +37,18 @@ public sealed class DetMap
 
     public DetTable Table(string name) => _tables[name];
 
+    public DetPathStore CreatePathStore(string name, int capacity = 256)
+    {
+        var store = new DetPathStore(name, capacity);
+        _pathStores[name] = store;
+        return store;
+    }
+
+    public DetPathStore PathStore(string name) => _pathStores[name];
+
     public IReadOnlyDictionary<string, Fix64> Globals => _globals;
     public IReadOnlyDictionary<string, DetTable> Tables => _tables;
+    public IReadOnlyDictionary<string, DetPathStore> PathStores => _pathStores;
 
     public byte[] ToBytes() => Snapshot.Serialize(this);
 

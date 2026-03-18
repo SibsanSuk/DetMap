@@ -19,7 +19,7 @@ Every read and write goes through **Fix64** fixed-point arithmetic (no `float`, 
   - [DetFlowField — direction + cost grid](#detflowfield--direction--cost-grid)
 - [Tables](#tables)
   - [DetTable — column-oriented entity store](#dettable--column-oriented-entity-store)
-  - [DetPathCol — path column](#detpathcol--path-column)
+- [DetPathStore — path store](#detpathstore--path-store)
 - [Pathfinding](#pathfinding)
 - [Building System](#building-system)
 - [Query Engine](#query-engine)
@@ -43,8 +43,9 @@ DetMap                       ← top-level facade (tick, globals, tables)
 
 DetTable                     ← column-oriented entity store
   ├── DetCol<T>              ← typed value column (byte / int / Fix64)
-  ├── DetStringCol           ← string column
-  └── DetPathCol             ← A* path column (not serialized by Snapshot)
+  └── DetStringCol           ← string column
+
+DetPathStore                 ← named path store (entityId → DetPath), serialized by Snapshot
 
 DetPathfinder                ← A* with Chebyshev heuristic + cell-index tie-breaking
 QueryEngine                  ← rect, radius, flood-fill queries (zero allocation via caller buffer)
@@ -131,8 +132,10 @@ var path = pf.FindPath(5, 5, 30, 30, walkable);
 map.AdvanceTick();
 
 // 9. Move entity along path
-ref DetPath p = ref new DetPathCol(1).Get(0); // or store in a DetPathCol
-// p.Advance(); var (nx, ny) = p.Current(64);
+var pathStore = map.CreatePathStore("unitPaths");
+pathStore.Set(id, path);
+ref DetPath p = ref pathStore.Get(id);
+if (p.IsValid && !p.IsComplete) { p.Advance(); var (nx, ny) = p.Current(64); }
 
 // 10. Save / Load
 byte[] save = map.ToBytes();
@@ -333,32 +336,46 @@ DetStringCol name2 = t.GetStringCol("name");
 
 ---
 
-### DetPathCol — path column
+---
 
-Standalone column for storing one `DetPath` per entity. Not part of `DetTable._cols` and not serialized by `Snapshot` — manage separately.
+## DetPathStore — path store
+
+Named DB-level structure that maps `entityId → DetPath`. Lives on `DetMap` alongside tables — serialized automatically by `Snapshot`.
 
 ```csharp
-int capacity = 256;
-var pathCol = new DetPathCol(capacity);
+// Create — registered on DetMap, saved by Snapshot
+DetPathStore paths = map.CreatePathStore("unitPaths");
 
-var pf   = new DetPathfinder(64, 64);
-var path = pf.FindPath(2, 5, 30, 30, walkable);
-pathCol.Set(entityId, path);
+var pf = new DetPathfinder(64, 64);
+paths.Set(0, pf.FindPath(0, 0, 20, 20, walkable));
+paths.Set(1, pf.FindPath(1, 0, 20, 20, walkable));
 
-// Get by ref to avoid copying the struct
-ref DetPath p = ref pathCol.Get(entityId);
+// Get by ref — modify in-place without copying
+ref DetPath p = ref paths.Get(0);
 
 if (p.IsValid && !p.IsComplete)
 {
     p.Advance();
     var (nx, ny) = p.Current(mapWidth: 64);
-    units.Move(entityId, nx, ny);
+    units.Move(0, nx, ny);
 }
 
 // Peek next step without advancing
 var (px, py) = p.Peek(64);
 
-pathCol.Clear(entityId); // reset path
+paths.Clear(0); // reset path for entity 0
+
+// Retrieve from map by name
+DetPathStore ps = map.PathStore("unitPaths");
+```
+
+**Architecture position:**
+
+```text
+DetMap
+  ├── DetGrid      → spatial layers
+  ├── Tables       → entity attributes (hp, name, job)
+  └── PathStores   → entity paths  ← here
 ```
 
 ---
@@ -520,7 +537,8 @@ Fix64     xp    = chars.GetCol<Fix64>("xp").Get(0);
                 alive col data  user col data × colCount
 ```
 
-**What is not saved by `Snapshot`:** `DetPathCol` (standalone, user-managed).
+**What is saved:** layers, globals, tables, path stores, tick.
+**What is not saved:** `DetPathCol` (legacy standalone — use `DetPathStore` instead).
 
 ---
 
@@ -582,7 +600,7 @@ void Awake()
     _hpCol   = _table.CreateCol("hp", DetType.Int);
 
     _pathfinder = new DetPathfinder(64, 64);
-    _pathCols   = new DetPathCol(256);
+    _paths      = _map.CreatePathStore("unitPaths");
 }
 
 // Per-tick update — call from FixedUpdate or a lockstep loop
@@ -624,9 +642,12 @@ map.AdvanceTick()
 map.SetGlobal(string key, Fix64 value)
 Fix64 map.GetGlobal(string key)          // returns Zero if missing
 map.Globals                              // IReadOnlyDictionary<string, Fix64>
-DetTable map.CreateTable(string name, int capacity = 256)
-DetTable map.Table(string name)
+DetTable     map.CreateTable(string name, int capacity = 256)
+DetTable     map.Table(string name)
 map.Tables                               // IReadOnlyDictionary<string, DetTable>
+DetPathStore map.CreatePathStore(string name, int capacity = 256)
+DetPathStore map.PathStore(string name)
+map.PathStores                           // IReadOnlyDictionary<string, DetPathStore>
 byte[] map.ToBytes()                     // Snapshot.Serialize(map)
 DetMap.FromBytes(byte[] data)            // Snapshot.Deserialize(data)
 ```
@@ -709,6 +730,14 @@ DetCol<T>    table.GetCol<T>(string name)
 DetStringCol table.GetStringCol(string name)
 IEnumerable<int> table.GetAlive()        // 0..HighWater, alive only
 int table.HighWater
+```
+
+### DetPathStore
+
+```csharp
+store.Set(int entityId, DetPath path)
+ref DetPath store.Get(int entityId)      // ref — modify in-place
+store.Clear(int entityId)
 ```
 
 ### DetPathfinder / DetPath

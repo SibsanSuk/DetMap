@@ -1,6 +1,7 @@
 using DetMath;
 using DetMap.Core;
 using DetMap.Layers;
+using DetMap.Pathfinding;
 using DetMap.Tables;
 
 namespace DetMap.Serialization;
@@ -8,9 +9,9 @@ namespace DetMap.Serialization;
 /// <summary>
 /// Binary save/load for DetMap.
 ///
-/// Format:
+/// Format (version 2):
 ///   [4]  magic: 'D','M','A','P'
-///   [2]  version: 1
+///   [2]  version: 2
 ///   ── SCHEMA ──────────────────────────────────────────
 ///   [4]  grid width
 ///   [4]  grid height
@@ -21,17 +22,21 @@ namespace DetMap.Serialization;
 ///       per col: [1] kind  [str] name
 ///   [4]  global count (keys in ordinal-sorted order)
 ///     per global: [str] key
+///   [4]  pathstore count
+///     per pathstore: [str] name
 ///   ── DATA ────────────────────────────────────────────
 ///   [8]  tick (ulong)
-///   layer data × N (raw bytes, no name — matches schema order)
-///   global values × G (Fix64 RawValue, matches schema order): [8] each
-///   table data × T: [4] highWater  [4] freeCount  [freeList...]
+///   layer data × N (raw bytes, schema order)
+///   global values × G (Fix64 RawValue, schema order): [8] each
+///   table data × T: [4] highWater  [4] freeCount  freeList[]
 ///                   alive col data  col data × colCount
+///   pathstore data × P: [4] slotCount
+///     per slot: [4] length  if length>0: [4] currentStep  [length×4] steps
 /// </summary>
 public static class Snapshot
 {
     private static readonly byte[] Magic = { (byte)'D', (byte)'M', (byte)'A', (byte)'P' };
-    private const ushort Version = 1;
+    private const ushort Version = 2;
 
     public static byte[] Serialize(DetMap.Core.DetMap map)
     {
@@ -66,11 +71,14 @@ public static class Snapshot
             }
         }
 
-        // Globals sorted by key for deterministic output
         var globalKeys = new List<string>(map.Globals.Keys);
         globalKeys.Sort(StringComparer.Ordinal);
         bw.Write(globalKeys.Count);
         foreach (var key in globalKeys) bw.Write(key);
+
+        var pathStores = new List<DetPathStore>(map.PathStores.Values);
+        bw.Write(pathStores.Count);
+        foreach (var store in pathStores) bw.Write(store.Name);
 
         // ── DATA ────────────────────────────────────────────────────────────
         bw.Write(map.Tick);
@@ -85,6 +93,9 @@ public static class Snapshot
         foreach (var table in tables)
             table.WriteDataToStream(bw);
 
+        foreach (var store in pathStores)
+            store.WriteToStream(bw);
+
         return ms.ToArray();
     }
 
@@ -93,12 +104,11 @@ public static class Snapshot
         using var ms = new MemoryStream(data);
         using var br = new BinaryReader(ms);
 
-        // Magic + version
         var magic = br.ReadBytes(4);
         if (magic[0] != 'D' || magic[1] != 'M' || magic[2] != 'A' || magic[3] != 'P')
             throw new InvalidDataException("Not a DetMap save file.");
         ushort version = br.ReadUInt16();
-        if (version != 1)
+        if (version != Version)
             throw new InvalidDataException($"Unsupported snapshot version: {version}.");
 
         // ── SCHEMA ──────────────────────────────────────────────────────────
@@ -126,6 +136,10 @@ public static class Snapshot
         var globalKeys = new string[globalCount];
         for (int i = 0; i < globalCount; i++) globalKeys[i] = br.ReadString();
 
+        int pathStoreCount = br.ReadInt32();
+        var pathStoreNames = new string[pathStoreCount];
+        for (int i = 0; i < pathStoreCount; i++) pathStoreNames[i] = br.ReadString();
+
         // ── DATA ────────────────────────────────────────────────────────────
         ulong tick = br.ReadUInt64();
 
@@ -148,6 +162,12 @@ public static class Snapshot
             foreach (var (kind, colName) in cols)
                 RegisterCol(table, kind, colName);
             table.ReadDataFromStream(br);
+        }
+
+        foreach (var name in pathStoreNames)
+        {
+            var store = map.CreatePathStore(name);
+            store.ReadFromStream(br);
         }
 
         return map;

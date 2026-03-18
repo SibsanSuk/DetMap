@@ -2,6 +2,7 @@ using DetMath;
 using DetMap.Building;
 using DetMap.Core;
 using DetMap.Layers;
+using DetMap.Pathfinding;
 using DetMap.Tables;
 
 namespace DetMap.Tests.Serialization;
@@ -58,6 +59,16 @@ public class SnapshotTests
         xpCol.Set(id1, Fix64.FromInt(500));
 
         chars.Delete(id0); // creates a free-list entry
+
+        // path store
+        var walkable2 = map.Grid.Structure<DetBitLayer>("walkable");
+        var pf        = new DetPathfinder(16, 16);
+        var paths     = map.CreatePathStore("unitPaths");
+        paths.Set(0, pf.FindPath(0, 0, 8, 8, walkable2));
+        paths.Set(1, pf.FindPath(1, 0, 8, 8, walkable2));
+        ref DetPath p0 = ref paths.Get(0);
+        p0.Advance();
+        p0.Advance(); // currentStep = 2
 
         // advance tick
         map.AdvanceTick();
@@ -255,6 +266,47 @@ public class SnapshotTests
         // Version is at offset 4 (after 4-byte magic)
         bytes[4] = 99; // unsupported version
         Assert.Throws<InvalidDataException>(() => DetMap.Core.DetMap.FromBytes(bytes));
+    }
+
+    // ── path store ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void RoundTrip_PathStore_IsRegistered()
+    {
+        var map  = BuildFullMap();
+        var map2 = DetMap.Core.DetMap.FromBytes(map.ToBytes());
+        Assert.True(map2.PathStores.ContainsKey("unitPaths"));
+    }
+
+    [Fact]
+    public void RoundTrip_PathStore_ValidPath_LengthPreserved()
+    {
+        var map  = BuildFullMap();
+        var map2 = DetMap.Core.DetMap.FromBytes(map.ToBytes());
+        ref DetPath p = ref map2.PathStore("unitPaths").Get(0);
+        Assert.True(p.IsValid);
+        Assert.Equal(map.PathStore("unitPaths").Get(0).Length, p.Length);
+    }
+
+    [Fact]
+    public void RoundTrip_PathStore_CurrentStepPreserved()
+    {
+        var map  = BuildFullMap();
+        var map2 = DetMap.Core.DetMap.FromBytes(map.ToBytes());
+        // BuildFullMap advances path[0] by 2 steps
+        Assert.Equal(2, map2.PathStore("unitPaths").Get(0).CurrentStep);
+    }
+
+    [Fact]
+    public void RoundTrip_PathStore_StepsPreserved()
+    {
+        var map  = BuildFullMap();
+        var map2 = DetMap.Core.DetMap.FromBytes(map.ToBytes());
+        var p1 = map.PathStore("unitPaths").Get(1);
+        var p2 = map2.PathStore("unitPaths").Get(1);
+        Assert.Equal(p1.Length, p2.Length);
+        for (int i = 0; i < p1.Length; i++)
+            Assert.Equal(p1.Steps![i], p2.Steps![i]);
     }
 
     // ── idempotency ───────────────────────────────────────────────────────────
