@@ -1,0 +1,174 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>DetMath</name>
+    </assembly>
+    <members>
+        <member name="T:DetMath.DetMathf">
+            <summary>
+            Deterministic math functions for Fix64.
+            Mirrors Unity's <c>Mathf</c> — call <c>DetMathf.X</c> instead of <c>Mathf.X</c>.
+            </summary>
+        </member>
+        <member name="M:DetMath.DetMathf.Abs(DetMath.Fix64)">
+            <summary>Returns the absolute value. Example: Abs(−3.00) → 3.00</summary>
+        </member>
+        <member name="M:DetMath.DetMathf.Min(DetMath.Fix64,DetMath.Fix64)">
+            <summary>Returns the lesser of two values.</summary>
+        </member>
+        <member name="M:DetMath.DetMathf.Max(DetMath.Fix64,DetMath.Fix64)">
+            <summary>Returns the greater of two values.</summary>
+        </member>
+        <member name="M:DetMath.DetMathf.Clamp(DetMath.Fix64,DetMath.Fix64,DetMath.Fix64)">
+            <summary>
+            Clamps <paramref name="value"/> to [<paramref name="min"/>, <paramref name="max"/>].
+            Use <c>Clamp(v, Fix64.Zero, Fix64.One)</c> for a 0–1 range.
+            </summary>
+            <exception cref="T:System.ArgumentException">Thrown when min &gt; max.</exception>
+        </member>
+        <member name="M:DetMath.DetMathf.Lerp(DetMath.Fix64,DetMath.Fix64,DetMath.Fix64)">
+            <summary>
+            Linearly interpolates from <paramref name="from"/> to <paramref name="to"/>.
+            <paramref name="t"/> is clamped to [0, 1] — use for smooth transitions.
+            Example: Lerp(2, 8, 0.50) → 5.00
+            </summary>
+        </member>
+        <member name="M:DetMath.DetMathf.Ratio(System.Int32,System.Int32)">
+            <summary>
+            Shorthand for <c>Fix64.FromRatio(n, d)</c>.
+            Example: Ratio(3, 2) → 1.50
+            </summary>
+        </member>
+        <member name="T:DetMath.DetVector2">
+            <summary>
+            Immutable 2D vector using Fix64 components.
+            Use for directions, velocities, and influence calculations in simulation logic.
+            </summary>
+        </member>
+        <member name="F:DetMath.DetVector2.Zero">
+            <summary>(0.00, 0.00)</summary>
+        </member>
+        <member name="F:DetMath.DetVector2.UnitX">
+            <summary>(1.00, 0.00)</summary>
+        </member>
+        <member name="F:DetMath.DetVector2.UnitY">
+            <summary>(0.00, 1.00)</summary>
+        </member>
+        <member name="M:DetMath.DetVector2.#ctor(DetMath.Fix64,DetMath.Fix64)">
+            <summary>Creates a 2D vector with the given components.</summary>
+        </member>
+        <member name="P:DetMath.DetVector2.X">
+            <summary>Horizontal component.</summary>
+        </member>
+        <member name="P:DetMath.DetVector2.Y">
+            <summary>Vertical component.</summary>
+        </member>
+        <member name="P:DetMath.DetVector2.LengthSquared">
+            <summary>
+            X² + Y² — squared length of the vector.
+            Use to compare distances without needing Sqrt.
+            </summary>
+        </member>
+        <member name="M:DetMath.DetVector2.Dot(DetMath.DetVector2,DetMath.DetVector2)">
+            <summary>
+            Returns the dot product of two vectors.
+            Result is 1.00 when parallel, 0.00 when perpendicular, −1.00 when opposite.
+            Use to measure alignment between a unit's facing direction and a target direction.
+            </summary>
+        </member>
+        <member name="T:DetMath.Fix64">
+            <summary>
+            Deterministic fixed-point number with 2 decimal places.
+            All arithmetic uses <c>long</c> integers — no float, no double.
+            Identical results on every platform (x86, ARM, etc.).
+            Safe multiplication range: ±30,370,004.
+            </summary>
+        </member>
+        <member name="F:DetMath.Fix64.Precision">
+            <summary>Internal scale factor. 1 unit = 100 raw.</summary>
+        </member>
+        <member name="F:DetMath.Fix64.Zero">
+            <summary>0.00</summary>
+        </member>
+        <member name="F:DetMath.Fix64.One">
+            <summary>1.00</summary>
+        </member>
+        <member name="F:DetMath.Fix64.Half">
+            <summary>0.50</summary>
+        </member>
+        <member name="P:DetMath.Fix64.RawValue">
+            <summary>
+            Internal integer representation. Divide by <see cref="F:DetMath.Fix64.Precision"/> to get the real value.
+            Use for display only: <c>(float)value.RawValue / Fix64.Precision</c>
+            </summary>
+        </member>
+        <member name="M:DetMath.Fix64.FromRaw(System.Int64)">
+            <summary>
+            Creates a Fix64 directly from a raw internal value.
+            Only use when you know the raw value explicitly.
+            </summary>
+        </member>
+        <member name="M:DetMath.Fix64.FromInt(System.Int32)">
+            <summary>
+            Creates a Fix64 from a whole integer. Example: <c>FromInt(3)</c> → 3.00
+            </summary>
+        </member>
+        <member name="M:DetMath.Fix64.FromRatio(System.Int32,System.Int32)">
+            <summary>
+            Creates a Fix64 from a ratio. Example: <c>FromRatio(3, 2)</c> → 1.50
+            Prefer this over float literals. Truncates toward zero if not exact.
+            </summary>
+            <exception cref="T:System.DivideByZeroException">Thrown when denominator is 0.</exception>
+        </member>
+        <member name="M:DetMath.Fix64.ToIntFloor">
+            <summary>
+            Converts to the largest integer less than or equal to this value (floor toward −∞).
+            Example: −1.50 → −2. Use for completed cycle counts.
+            </summary>
+        </member>
+        <member name="M:DetMath.Fix64.ToIntTruncate">
+            <summary>
+            Converts to integer by discarding the fractional part (truncate toward zero).
+            Example: −1.50 → −1.
+            </summary>
+        </member>
+        <member name="M:DetMath.Fix64.ToString">
+            <summary>
+            Returns the value formatted as a decimal string. Example: "1.50"
+            Use for display and logging only — do not parse back into Fix64.
+            </summary>
+        </member>
+        <member name="T:DetMath.GridPoint">
+            <summary>
+            Immutable integer coordinate on a tile grid.
+            Use for building positions, unit positions, and path cost calculations.
+            </summary>
+        </member>
+        <member name="F:DetMath.GridPoint.Zero">
+            <summary>(0, 0)</summary>
+        </member>
+        <member name="M:DetMath.GridPoint.#ctor(System.Int32,System.Int32)">
+            <summary>Creates a grid coordinate at (x, y).</summary>
+        </member>
+        <member name="P:DetMath.GridPoint.X">
+            <summary>Horizontal tile coordinate.</summary>
+        </member>
+        <member name="P:DetMath.GridPoint.Y">
+            <summary>Vertical tile coordinate.</summary>
+        </member>
+        <member name="M:DetMath.GridPoint.ManhattanDistance(DetMath.GridPoint)">
+            <summary>
+            Returns the number of steps to reach <paramref name="other"/> moving in 4 directions only (up/down/left/right).
+            Use for road networks and grid-based pathfinding.
+            Example: (3,7) → (8,2) = 10
+            </summary>
+        </member>
+        <member name="M:DetMath.GridPoint.ChebyshevDistance(DetMath.GridPoint)">
+            <summary>
+            Returns the number of steps to reach <paramref name="other"/> moving in 8 directions (including diagonal).
+            Use for unit movement where diagonal costs the same as cardinal.
+            Example: (3,7) → (8,2) = 5
+            </summary>
+        </member>
+    </members>
+</doc>

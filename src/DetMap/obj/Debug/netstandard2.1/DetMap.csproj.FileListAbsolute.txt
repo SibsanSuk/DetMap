@@ -1,0 +1,15 @@
+/Users/sibsan/GitHub/DetMap/src/DetMap/obj/Debug/netstandard2.1/DetMap.csproj.AssemblyReference.cache
+/Users/sibsan/GitHub/DetMap/src/DetMap/obj/Debug/netstandard2.1/DetMap.GeneratedMSBuildEditorConfig.editorconfig
+/Users/sibsan/GitHub/DetMap/src/DetMap/obj/Debug/netstandard2.1/DetMap.AssemblyInfoInputs.cache
+/Users/sibsan/GitHub/DetMap/src/DetMap/obj/Debug/netstandard2.1/DetMap.AssemblyInfo.cs
+/Users/sibsan/GitHub/DetMap/src/DetMap/obj/Debug/netstandard2.1/DetMap.csproj.CoreCompileInputs.cache
+/Users/sibsan/GitHub/DetMap/src/DetMap/obj/Debug/netstandard2.1/DetMap.sourcelink.json
+/Users/sibsan/GitHub/DetMap/src/DetMap/bin/Debug/netstandard2.1/DetMap.deps.json
+/Users/sibsan/GitHub/DetMap/src/DetMap/bin/Debug/netstandard2.1/DetMap.dll
+/Users/sibsan/GitHub/DetMap/src/DetMap/bin/Debug/netstandard2.1/DetMap.pdb
+/Users/sibsan/GitHub/DetMap/src/DetMap/bin/Debug/netstandard2.1/DetMath.dll
+/Users/sibsan/GitHub/DetMap/src/DetMap/bin/Debug/netstandard2.1/DetMath.pdb
+/Users/sibsan/GitHub/DetMap/src/DetMap/bin/Debug/netstandard2.1/DetMath.xml
+/Users/sibsan/GitHub/DetMap/src/DetMap/obj/Debug/netstandard2.1/DetMap.csproj.Up2Date
+/Users/sibsan/GitHub/DetMap/src/DetMap/obj/Debug/netstandard2.1/DetMap.dll
+/Users/sibsan/GitHub/DetMap/src/DetMap/obj/Debug/netstandard2.1/DetMap.pdb
