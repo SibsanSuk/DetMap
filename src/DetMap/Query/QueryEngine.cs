@@ -2,14 +2,14 @@ using DetMap.Core;
 
 namespace DetMap.Query;
 
-public delegate bool CellFilter(DetGrid grid, int x, int y);
+public delegate bool CellPredicate(DetGrid grid, int x, int y);
 
 public static class QueryEngine
 {
     public static int RectQuery(
         DetGrid grid,
         int minX, int minY, int maxX, int maxY,
-        CellFilter predicate,
+        CellPredicate predicate,
         CellHit[] resultBuffer)
     {
         int count = 0;
@@ -26,7 +26,7 @@ public static class QueryEngine
     public static int RadiusQuery(
         DetGrid grid,
         int cx, int cy, int radius,
-        CellFilter predicate,
+        CellPredicate predicate,
         CellHit[] resultBuffer)
     {
         int count = 0;
@@ -46,7 +46,7 @@ public static class QueryEngine
     public static int FloodFill(
         DetGrid grid,
         int startX, int startY,
-        CellFilter canSpread,
+        CellPredicate canSpread,
         CellHit[] resultBuffer)
     {
         if (!grid.InBounds(startX, startY) || !canSpread(grid, startX, startY))

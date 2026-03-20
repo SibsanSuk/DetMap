@@ -2,20 +2,20 @@ using DetMap.Core;
 
 namespace DetMap.Layers;
 
-public sealed class DetEntityMap : IDetLayer, IDetSpatial
+public sealed class DetEntityLayer : IDetLayer, IDetSpatial
 {
     private readonly int _width;
     private readonly int _height;
     private int[] _cellOf;        // entityId → cell index (-1 = not placed)
     private int[] _next;          // entityId → next entityId in same cell (-1 = end)
     private readonly Dictionary<int, int> _heads = new(); // cellKey → head entityId
-    private readonly DetLayer<byte> _countCache;
+    private readonly DetValueLayer<byte> _countCache;
 
     public string Name { get; }
-    public DetLayerKind Kind => DetLayerKind.EntityMap;
+    public DetLayerKind Kind => DetLayerKind.Entity;
     public DirtyRect Dirty => _countCache.Dirty;
 
-    public DetEntityMap(string name, int width, int height, int maxEntities = 4096)
+    public DetEntityLayer(string name, int width, int height, int maxEntities = 4096)
     {
         Name = name;
         _width = width;
@@ -24,7 +24,7 @@ public sealed class DetEntityMap : IDetLayer, IDetSpatial
         _next = new int[maxEntities];
         Array.Fill(_cellOf, -1);
         Array.Fill(_next, -1);
-        _countCache = new DetLayer<byte>("__" + name + "_count", width, height);
+        _countCache = new DetValueLayer<byte>("__" + name + "_count", width, height);
     }
 
     private int CellKey(int x, int y) => y * _width + x;

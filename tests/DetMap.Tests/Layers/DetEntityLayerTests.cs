@@ -2,12 +2,12 @@ using DetMap.Layers;
 
 namespace DetMap.Tests.Layers;
 
-public class DetEntityMapTests
+public class DetEntityLayerTests
 {
     [Fact]
     public void Add_Entity_CountIsOne()
     {
-        var map = new DetEntityMap("units", 16, 16);
+        var map = new DetEntityLayer("units", 16, 16);
         map.Add(0, 5, 5);
         Assert.Equal(1, map.CountAt(5, 5));
     }
@@ -15,7 +15,7 @@ public class DetEntityMapTests
     [Fact]
     public void Add_MultipleEntities_SameCell_CountCorrect()
     {
-        var map = new DetEntityMap("units", 16, 16);
+        var map = new DetEntityLayer("units", 16, 16);
         map.Add(0, 3, 3);
         map.Add(1, 3, 3);
         map.Add(2, 3, 3);
@@ -25,7 +25,7 @@ public class DetEntityMapTests
     [Fact]
     public void Remove_Entity_CountDecreases()
     {
-        var map = new DetEntityMap("units", 16, 16);
+        var map = new DetEntityLayer("units", 16, 16);
         map.Add(0, 2, 2);
         map.Add(1, 2, 2);
         map.Remove(0);
@@ -35,7 +35,7 @@ public class DetEntityMapTests
     [Fact]
     public void Move_Entity_UpdatesCount()
     {
-        var map = new DetEntityMap("units", 16, 16);
+        var map = new DetEntityLayer("units", 16, 16);
         map.Add(0, 0, 0);
         map.Move(0, 5, 5);
         Assert.Equal(0, map.CountAt(0, 0));
@@ -45,7 +45,7 @@ public class DetEntityMapTests
     [Fact]
     public void GetEntitiesAt_ReturnsCorrectIds()
     {
-        var map = new DetEntityMap("units", 16, 16);
+        var map = new DetEntityLayer("units", 16, 16);
         map.Add(10, 4, 4);
         map.Add(20, 4, 4);
 
@@ -61,14 +61,14 @@ public class DetEntityMapTests
     [Fact]
     public void EmptyCell_CountIsZero()
     {
-        var map = new DetEntityMap("units", 16, 16);
+        var map = new DetEntityLayer("units", 16, 16);
         Assert.Equal(0, map.CountAt(0, 0));
     }
 
     [Fact]
     public void Remove_LastEntity_CountIsZero()
     {
-        var map = new DetEntityMap("units", 16, 16);
+        var map = new DetEntityLayer("units", 16, 16);
         map.Add(5, 7, 7);
         map.Remove(5);
         Assert.Equal(0, map.CountAt(7, 7));
@@ -82,7 +82,7 @@ public class DetEntityMapTests
     public void Add_EntityIdBeyondInitialCapacity_CountIsCorrect()
     {
         // maxEntities=4 so entity ID 4 triggers EnsureCapacity
-        var map = new DetEntityMap("units", 16, 16, maxEntities: 4);
+        var map = new DetEntityLayer("units", 16, 16, maxEntities: 4);
         map.Add(0, 0, 0);
         map.Add(1, 1, 1);
         map.Add(2, 2, 2);
@@ -97,7 +97,7 @@ public class DetEntityMapTests
         // After capacity growth, new entity must not be falsely linked to entity 0.
         // If new slots defaulted to 0 instead of -1, GetEntitiesAt would
         // return entity 0 as a ghost next-node of entity 4.
-        var map = new DetEntityMap("units", 16, 16, maxEntities: 4);
+        var map = new DetEntityLayer("units", 16, 16, maxEntities: 4);
         map.Add(0, 0, 0); // entity 0 at cell (0,0)
         map.Add(4, 5, 5); // triggers growth — new slot for id=4 must be -1, not 0
 
@@ -111,7 +111,7 @@ public class DetEntityMapTests
     [Fact]
     public void Move_EntityBeyondInitialCapacity_UpdatesCorrectly()
     {
-        var map = new DetEntityMap("units", 16, 16, maxEntities: 4);
+        var map = new DetEntityLayer("units", 16, 16, maxEntities: 4);
         map.Add(4, 2, 2); // triggers growth
         map.Move(4, 8, 8);
         Assert.Equal(0, map.CountAt(2, 2));
@@ -121,7 +121,7 @@ public class DetEntityMapTests
     [Fact]
     public void Remove_EntityBeyondInitialCapacity_CountIsZero()
     {
-        var map = new DetEntityMap("units", 16, 16, maxEntities: 4);
+        var map = new DetEntityLayer("units", 16, 16, maxEntities: 4);
         map.Add(4, 6, 6); // triggers growth
         map.Remove(4);
         Assert.Equal(0, map.CountAt(6, 6));
@@ -131,7 +131,7 @@ public class DetEntityMapTests
     public void Add_MultipleGrowthCycles_StillCorrect()
     {
         // Grow twice: 4 → 8 → 16
-        var map = new DetEntityMap("units", 32, 32, maxEntities: 4);
+        var map = new DetEntityLayer("units", 32, 32, maxEntities: 4);
         for (int i = 0; i < 16; i++)
             map.Add(i, i % 8, i % 8);
 

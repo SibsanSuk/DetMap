@@ -30,13 +30,13 @@ public class QueryEngineTests
     public void RectQuery_WithPredicate_FiltersCorrectly()
     {
         var grid = MakeGrid(8, 8);
-        var layer = grid.CreateLayer("val", DetType.Int);
+        var layer = grid.CreateValueLayer("val", DetType.Int);
         layer.Set(2, 2, 1);
         layer.Set(3, 3, 1);
 
         var results = new CellHit[64];
         int count = QueryEngine.RectQuery(grid, 0, 0, 7, 7,
-            (g, x, y) => g.Layer<int>("val").Get(x, y) == 1,
+            (g, x, y) => g.GetValueLayer<int>("val").Get(x, y) == 1,
             results);
         Assert.Equal(2, count);
     }
@@ -71,7 +71,7 @@ public class QueryEngineTests
 
         var results = new CellHit[25];
         int count = QueryEngine.FloodFill(grid, 0, 2,
-            (g, x, y) => g.Structure<DetBitLayer>("walkable").Get(x, y),
+            (g, x, y) => g.GetBitLayer("walkable").Get(x, y),
             results);
         Assert.Equal(10, count); // only left side: x=0,1 * y=0..4
     }

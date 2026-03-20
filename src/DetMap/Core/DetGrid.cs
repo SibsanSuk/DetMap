@@ -16,10 +16,10 @@ public sealed class DetGrid
     }
 
     /// <param name="type">Use <see cref="DetType.Byte"/>, <see cref="DetType.Int"/>, or <see cref="DetType.Fix64"/>.</param>
-    public DetLayer<T> CreateLayer<T>(string name, DetType<T> type, T defaultValue = default)
+    public DetValueLayer<T> CreateValueLayer<T>(string name, DetType<T> type, T defaultValue = default)
         where T : unmanaged
     {
-        var layer = new DetLayer<T>(name, Width, Height, defaultValue);
+        var layer = new DetValueLayer<T>(name, Width, Height, defaultValue);
         _layers[name] = layer;
         return layer;
     }
@@ -31,32 +31,41 @@ public sealed class DetGrid
         return layer;
     }
 
-    public DetEntityMap CreateEntityMap(string name)
+    public DetEntityLayer CreateEntityLayer(string name)
     {
-        var layer = new DetEntityMap(name, Width, Height);
+        var layer = new DetEntityLayer(name, Width, Height);
         _layers[name] = layer;
         return layer;
     }
 
-    public DetTagMap CreateTagMap(string name)
+    public DetTagLayer CreateTagLayer(string name)
     {
-        var layer = new DetTagMap(name, Width, Height);
+        var layer = new DetTagLayer(name, Width, Height);
         _layers[name] = layer;
         return layer;
     }
 
-    public DetFlowField CreateFlowField(string name)
+    public DetFlowLayer CreateFlowLayer(string name)
     {
-        var layer = new DetFlowField(name, Width, Height);
+        var layer = new DetFlowLayer(name, Width, Height);
         _layers[name] = layer;
         return layer;
     }
 
-    public DetLayer<T> Layer<T>(string name) where T : unmanaged
-        => (DetLayer<T>)_layers[name];
+    public DetValueLayer<T> GetValueLayer<T>(string name) where T : unmanaged
+        => (DetValueLayer<T>)_layers[name];
 
-    public T Structure<T>(string name) where T : class, IDetLayer
-        => (T)_layers[name];
+    public DetBitLayer GetBitLayer(string name)
+        => (DetBitLayer)_layers[name];
+
+    public DetEntityLayer GetEntityLayer(string name)
+        => (DetEntityLayer)_layers[name];
+
+    public DetTagLayer GetTagLayer(string name)
+        => (DetTagLayer)_layers[name];
+
+    public DetFlowLayer GetFlowLayer(string name)
+        => (DetFlowLayer)_layers[name];
 
     public IReadOnlyDictionary<string, IDetLayer> AllLayers => _layers;
 

@@ -4,7 +4,7 @@ using DetMap.Core;
 namespace DetMap.Layers;
 
 /// <summary>Direction constants: 0=N,1=E,2=S,3=W,4=NE,5=SE,6=SW,7=NW, 255=blocked</summary>
-public sealed class DetFlowField : IDetLayer, IDetReadable<byte>
+public sealed class DetFlowLayer : IDetLayer, IDetReadable<byte>
 {
     public const byte Blocked = 255;
 
@@ -17,10 +17,10 @@ public sealed class DetFlowField : IDetLayer, IDetReadable<byte>
     private readonly int _height;
 
     public string Name { get; }
-    public DetLayerKind Kind => DetLayerKind.FlowField;
+    public DetLayerKind Kind => DetLayerKind.Flow;
     public DirtyRect Dirty { get; private set; }
 
-    public DetFlowField(string name, int width, int height)
+    public DetFlowLayer(string name, int width, int height)
     {
         Name = name;
         _width = width;

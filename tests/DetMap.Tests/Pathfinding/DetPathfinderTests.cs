@@ -126,7 +126,7 @@ public class DetPathfinderTests
     public void FindPath_UnitCount_AvoidsCongestion()
     {
         var walkable = AllWalkable(10, 10);
-        var unitCount = new DetLayer<byte>("units", 10, 10);
+        var unitCount = new DetValueLayer<byte>("units", 10, 10);
         // Mark x=5 column as heavily congested
         for (int y = 0; y < 10; y++) unitCount.Set(5, y, 50);
 

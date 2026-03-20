@@ -9,7 +9,7 @@ public sealed class DetBitLayer : IDetLayer, IDetReadable<bool>
     private readonly int _height;
 
     public string Name { get; }
-    public DetLayerKind Kind => DetLayerKind.BitLayer;
+    public DetLayerKind Kind => DetLayerKind.Bit;
     public DirtyRect Dirty { get; private set; }
 
     public DetBitLayer(string name, int width, int height)

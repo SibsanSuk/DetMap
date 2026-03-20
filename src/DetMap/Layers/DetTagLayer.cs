@@ -2,16 +2,16 @@ using DetMap.Core;
 
 namespace DetMap.Layers;
 
-public sealed class DetTagMap : IDetLayer, IDetSpatial
+public sealed class DetTagLayer : IDetLayer, IDetSpatial
 {
     private readonly int _width;
     private readonly Dictionary<int, List<string>> _cellTags = new();
 
     public string Name { get; }
-    public DetLayerKind Kind => DetLayerKind.TagMap;
+    public DetLayerKind Kind => DetLayerKind.Tag;
     public DirtyRect Dirty { get; private set; }
 
-    public DetTagMap(string name, int width, int height)
+    public DetTagLayer(string name, int width, int height)
     {
         Name = name;
         _width = width;

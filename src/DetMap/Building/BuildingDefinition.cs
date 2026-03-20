@@ -1,20 +1,18 @@
-using DetMath;
-
 namespace DetMap.Building;
 
-public readonly struct BuildingDef
+public readonly struct BuildingDefinition
 {
     public readonly string Id;
     public readonly int W, H;
-    public readonly Fix64 BuildingId;
+    public readonly int BuildingTypeId;
     public readonly bool[]? Mask; // null = full rect
 
-    public BuildingDef(string id, int w, int h, Fix64 buildingId, bool[]? mask = null)
+    public BuildingDefinition(string id, int w, int h, int buildingTypeId, bool[]? mask = null)
     {
         Id = id;
         W = w;
         H = h;
-        BuildingId = buildingId;
+        BuildingTypeId = buildingTypeId;
         Mask = mask;
     }
 
@@ -22,7 +20,7 @@ public readonly struct BuildingDef
         => Mask == null || Mask[ly * W + lx];
 
     /// <summary>Creates an L-shaped building mask (fills all except top-right quadrant).</summary>
-    public static bool[] MakeLShape(int w, int h)
+    public static bool[] CreateLShapeMask(int w, int h)
     {
         var mask = new bool[w * h];
         for (int y = 0; y < h; y++)

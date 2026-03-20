@@ -35,44 +35,44 @@ public class DetGridTests
     public void CreateLayer_RetrievedByName()
     {
         var grid = new DetGrid(8, 8);
-        var layer = grid.CreateLayer("building", DetType.Int);
-        var retrieved = grid.Layer<int>("building");
+        var layer = grid.CreateValueLayer("building", DetType.Int);
+        var retrieved = grid.GetValueLayer<int>("building");
         Assert.Same(layer, retrieved);
     }
 
     [Fact]
-    public void CreateBitLayer_RetrievedViaStructure()
+    public void CreateBitLayer_RetrievedByName()
     {
         var grid = new DetGrid(8, 8);
         var layer = grid.CreateBitLayer("walkable");
-        var retrieved = grid.Structure<DetBitLayer>("walkable");
+        var retrieved = grid.GetBitLayer("walkable");
         Assert.Same(layer, retrieved);
     }
 
     [Fact]
-    public void CreateEntityMap_RetrievedViaStructure()
+    public void CreateEntityLayer_RetrievedByName()
     {
         var grid = new DetGrid(8, 8);
-        var layer = grid.CreateEntityMap("units");
-        var retrieved = grid.Structure<DetEntityMap>("units");
+        var layer = grid.CreateEntityLayer("units");
+        var retrieved = grid.GetEntityLayer("units");
         Assert.Same(layer, retrieved);
     }
 
     [Fact]
-    public void CreateTagMap_RetrievedViaStructure()
+    public void CreateTagLayer_RetrievedByName()
     {
         var grid = new DetGrid(8, 8);
-        var layer = grid.CreateTagMap("services");
-        var retrieved = grid.Structure<DetTagMap>("services");
+        var layer = grid.CreateTagLayer("services");
+        var retrieved = grid.GetTagLayer("services");
         Assert.Same(layer, retrieved);
     }
 
     [Fact]
-    public void CreateFlowField_RetrievedViaStructure()
+    public void CreateFlowLayer_RetrievedByName()
     {
         var grid = new DetGrid(8, 8);
-        var layer = grid.CreateFlowField("flow");
-        var retrieved = grid.Structure<DetFlowField>("flow");
+        var layer = grid.CreateFlowLayer("flow");
+        var retrieved = grid.GetFlowLayer("flow");
         Assert.Same(layer, retrieved);
     }
 
@@ -80,9 +80,9 @@ public class DetGridTests
     public void AllLayers_ContainsAllCreated()
     {
         var grid = new DetGrid(8, 8);
-        grid.CreateLayer("building", DetType.Int);
+        grid.CreateValueLayer("building", DetType.Int);
         grid.CreateBitLayer("walkable");
-        grid.CreateEntityMap("units");
+        grid.CreateEntityLayer("units");
         Assert.Equal(3, grid.AllLayers.Count);
     }
 

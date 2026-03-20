@@ -2,7 +2,7 @@ using DetMath;
 
 namespace DetMap.Tables;
 
-public enum DetColKind : byte
+public enum DetColumnKind : byte
 {
     Byte   = 0,
     Int    = 1,
@@ -10,24 +10,24 @@ public enum DetColKind : byte
     String = 3,
 }
 
-public interface IDetColData
+public interface IDetColumnData
 {
-    DetColKind Kind { get; }
+    DetColumnKind Kind { get; }
     void WriteToStream(BinaryWriter bw);
     void ReadFromStream(BinaryReader br);
 }
 
-public sealed class DetCol<T> : IDetColData where T : unmanaged
+public sealed class DetColumn<T> : IDetColumnData where T : unmanaged
 {
     private T[] _data;
 
-    public DetColKind Kind =>
-        typeof(T) == typeof(byte)  ? DetColKind.Byte  :
-        typeof(T) == typeof(int)   ? DetColKind.Int   :
-        typeof(T) == typeof(Fix64) ? DetColKind.Fix64 :
-        throw new NotSupportedException($"DetCol<{typeof(T).Name}> has no registered DetColKind");
+    public DetColumnKind Kind =>
+        typeof(T) == typeof(byte)  ? DetColumnKind.Byte  :
+        typeof(T) == typeof(int)   ? DetColumnKind.Int   :
+        typeof(T) == typeof(Fix64) ? DetColumnKind.Fix64 :
+        throw new NotSupportedException($"DetColumn<{typeof(T).Name}> has no registered DetColumnKind");
 
-    public DetCol(int capacity) => _data = new T[capacity];
+    public DetColumn(int capacity) => _data = new T[capacity];
 
     public T Get(int id) => _data[id];
 
@@ -61,7 +61,7 @@ public sealed class DetCol<T> : IDetColData where T : unmanaged
         if (value is byte b)   bw.Write(b);
         else if (value is int i)   bw.Write(i);
         else if (value is Fix64 f) bw.Write(f.RawValue);
-        else throw new NotSupportedException($"DetCol<{typeof(T).Name}> serialization not supported");
+        else throw new NotSupportedException($"DetColumn<{typeof(T).Name}> serialization not supported");
     }
 
     private static T ReadValue(BinaryReader br)
@@ -69,17 +69,17 @@ public sealed class DetCol<T> : IDetColData where T : unmanaged
         if (typeof(T) == typeof(byte))  return (T)(object)br.ReadByte();
         if (typeof(T) == typeof(int))   return (T)(object)br.ReadInt32();
         if (typeof(T) == typeof(Fix64)) return (T)(object)Fix64.FromRaw(br.ReadInt64());
-        throw new NotSupportedException($"DetCol<{typeof(T).Name}> deserialization not supported");
+        throw new NotSupportedException($"DetColumn<{typeof(T).Name}> deserialization not supported");
     }
 }
 
-public sealed class DetStringCol : IDetColData
+public sealed class DetStringColumn : IDetColumnData
 {
     private string?[] _data;
 
-    public DetColKind Kind => DetColKind.String;
+    public DetColumnKind Kind => DetColumnKind.String;
 
-    public DetStringCol(int capacity) => _data = new string?[capacity];
+    public DetStringColumn(int capacity) => _data = new string?[capacity];
 
     public string? Get(int id) => _data[id];
 

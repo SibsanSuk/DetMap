@@ -2,13 +2,13 @@ namespace DetMap.Core;
 
 public enum DetLayerKind : byte
 {
-    LayerByte  = 0,
-    LayerInt   = 1,
-    LayerFix64 = 2,
-    BitLayer   = 3,
-    EntityMap  = 4,
-    TagMap     = 5,
-    FlowField  = 6,
+    ValueByte = 0,
+    ValueInt  = 1,
+    ValueFix64 = 2,
+    Bit = 3,
+    Entity = 4,
+    Tag = 5,
+    Flow = 6,
 }
 
 public interface IDetLayer

@@ -33,7 +33,7 @@ public sealed class DetPathfinder
         int startX, int startY,
         int goalX, int goalY,
         DetBitLayer walkable,
-        DetLayer<byte>? unitCount = null,
+        DetValueLayer<byte>? unitCount = null,
         int maxSearchNodes = 2048)
     {
         if (!InBounds(startX, startY) || !InBounds(goalX, goalY))

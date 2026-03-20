@@ -35,7 +35,7 @@ public sealed class DetMap
         return table;
     }
 
-    public DetTable Table(string name) => _tables[name];
+    public DetTable GetTable(string name) => _tables[name];
 
     public DetPathStore CreatePathStore(string name, int capacity = 256)
     {
@@ -44,7 +44,7 @@ public sealed class DetMap
         return store;
     }
 
-    public DetPathStore PathStore(string name) => _pathStores[name];
+    public DetPathStore GetPathStore(string name) => _pathStores[name];
 
     public IReadOnlyDictionary<string, Fix64> Globals => _globals;
     public IReadOnlyDictionary<string, DetTable> Tables => _tables;

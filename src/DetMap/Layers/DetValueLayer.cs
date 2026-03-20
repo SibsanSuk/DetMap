@@ -4,7 +4,7 @@ using DetMap.Core;
 
 namespace DetMap.Layers;
 
-public sealed class DetLayer<T> : IDetLayer, IDetReadable<T> where T : unmanaged
+public sealed class DetValueLayer<T> : IDetLayer, IDetReadable<T> where T : unmanaged
 {
     private readonly T[] _data;
     private readonly int _width;
@@ -13,14 +13,14 @@ public sealed class DetLayer<T> : IDetLayer, IDetReadable<T> where T : unmanaged
     public string Name { get; }
 
     public DetLayerKind Kind =>
-        typeof(T) == typeof(byte)  ? DetLayerKind.LayerByte  :
-        typeof(T) == typeof(int)   ? DetLayerKind.LayerInt   :
-        typeof(T) == typeof(Fix64) ? DetLayerKind.LayerFix64 :
-        throw new NotSupportedException($"DetLayer<{typeof(T).Name}> has no registered DetLayerKind");
+        typeof(T) == typeof(byte)  ? DetLayerKind.ValueByte  :
+        typeof(T) == typeof(int)   ? DetLayerKind.ValueInt   :
+        typeof(T) == typeof(Fix64) ? DetLayerKind.ValueFix64 :
+        throw new NotSupportedException($"DetValueLayer<{typeof(T).Name}> has no registered DetLayerKind");
 
     public DirtyRect Dirty { get; private set; }
 
-    public DetLayer(string name, int width, int height, T defaultValue = default)
+    public DetValueLayer(string name, int width, int height, T defaultValue = default)
     {
         Name = name;
         _width = width;

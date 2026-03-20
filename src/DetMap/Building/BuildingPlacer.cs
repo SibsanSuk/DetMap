@@ -10,8 +10,8 @@ public static class BuildingPlacer
     public static bool CanPlace(
         DetGrid grid,
         int ox, int oy,
-        BuildingDef def,
-        DetLayer<int> buildingLayer,
+        BuildingDefinition def,
+        DetValueLayer<int> buildingLayer,
         DetBitLayer walkable,
         CellPredicate? extraCheck = null)
     {
@@ -30,11 +30,11 @@ public static class BuildingPlacer
     public static void Place(
         DetGrid grid,
         int ox, int oy,
-        BuildingDef def,
-        DetLayer<int> buildingLayer,
+        BuildingDefinition def,
+        DetValueLayer<int> buildingLayer,
         DetBitLayer walkable)
     {
-        int id = def.BuildingId.ToIntTruncate();
+        int id = def.BuildingTypeId;
         for (int ly = 0; ly < def.H; ly++)
         for (int lx = 0; lx < def.W; lx++)
         {
@@ -48,8 +48,8 @@ public static class BuildingPlacer
     public static void Remove(
         DetGrid grid,
         int ox, int oy,
-        BuildingDef def,
-        DetLayer<int> buildingLayer,
+        BuildingDefinition def,
+        DetValueLayer<int> buildingLayer,
         DetBitLayer walkable)
     {
         for (int ly = 0; ly < def.H; ly++)

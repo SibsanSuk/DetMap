@@ -63,10 +63,10 @@ public static class Snapshot
         foreach (var table in tables)
         {
             bw.Write(table.Name);
-            bw.Write(table.ColOrder.Count);
-            foreach (var colName in table.ColOrder)
+            bw.Write(table.ColumnOrder.Count);
+            foreach (var colName in table.ColumnOrder)
             {
-                bw.Write((byte)table.GetColData(colName).Kind);
+                bw.Write((byte)table.GetColumnData(colName).Kind);
                 bw.Write(colName);
             }
         }
@@ -121,14 +121,14 @@ public static class Snapshot
             layerSchema[i] = ((DetLayerKind)br.ReadByte(), br.ReadString());
 
         int tableCount = br.ReadInt32();
-        var tableSchema = new (string Name, (DetColKind Kind, string ColName)[] Cols)[tableCount];
+        var tableSchema = new (string Name, (DetColumnKind Kind, string ColName)[] Cols)[tableCount];
         for (int i = 0; i < tableCount; i++)
         {
             string tName = br.ReadString();
             int colCount = br.ReadInt32();
-            var cols = new (DetColKind, string)[colCount];
+            var cols = new (DetColumnKind, string)[colCount];
             for (int j = 0; j < colCount; j++)
-                cols[j] = ((DetColKind)br.ReadByte(), br.ReadString());
+                cols[j] = ((DetColumnKind)br.ReadByte(), br.ReadString());
             tableSchema[i] = (tName, cols);
         }
 
@@ -149,7 +149,7 @@ public static class Snapshot
         int cellCount = width * height;
         foreach (var (kind, name) in layerSchema)
         {
-            IDetLayer layer = CreateLayer(map, kind, name);
+            IDetLayer layer = CreateLayerFromKind(map, kind, name);
             layer.ReadFromStream(br, cellCount);
         }
 
@@ -160,7 +160,7 @@ public static class Snapshot
         {
             var table = map.CreateTable(tName);
             foreach (var (kind, colName) in cols)
-                RegisterCol(table, kind, colName);
+                RegisterColumn(table, kind, colName);
             table.ReadDataFromStream(br);
         }
 
@@ -173,27 +173,27 @@ public static class Snapshot
         return map;
     }
 
-    private static IDetLayer CreateLayer(DetMap.Core.DetMap map, DetLayerKind kind, string name)
+    private static IDetLayer CreateLayerFromKind(DetMap.Core.DetMap map, DetLayerKind kind, string name)
         => kind switch
         {
-            DetLayerKind.LayerByte  => map.Grid.CreateLayer(name, DetType.Byte),
-            DetLayerKind.LayerInt   => map.Grid.CreateLayer(name, DetType.Int),
-            DetLayerKind.LayerFix64 => map.Grid.CreateLayer(name, DetType.Fix64),
-            DetLayerKind.BitLayer   => map.Grid.CreateBitLayer(name),
-            DetLayerKind.EntityMap  => map.Grid.CreateEntityMap(name),
-            DetLayerKind.TagMap     => map.Grid.CreateTagMap(name),
-            DetLayerKind.FlowField  => map.Grid.CreateFlowField(name),
+            DetLayerKind.ValueByte  => map.Grid.CreateValueLayer(name, DetType.Byte),
+            DetLayerKind.ValueInt   => map.Grid.CreateValueLayer(name, DetType.Int),
+            DetLayerKind.ValueFix64 => map.Grid.CreateValueLayer(name, DetType.Fix64),
+            DetLayerKind.Bit => map.Grid.CreateBitLayer(name),
+            DetLayerKind.Entity => map.Grid.CreateEntityLayer(name),
+            DetLayerKind.Tag => map.Grid.CreateTagLayer(name),
+            DetLayerKind.Flow => map.Grid.CreateFlowLayer(name),
             _ => throw new InvalidDataException($"Unknown layer kind: {(byte)kind}"),
         };
 
-    private static void RegisterCol(DetTable table, DetColKind kind, string colName)
+    private static void RegisterColumn(DetTable table, DetColumnKind kind, string colName)
     {
         switch (kind)
         {
-            case DetColKind.Byte:   table.CreateCol(colName, DetType.Byte);   break;
-            case DetColKind.Int:    table.CreateCol(colName, DetType.Int);    break;
-            case DetColKind.Fix64:  table.CreateCol(colName, DetType.Fix64);  break;
-            case DetColKind.String: table.CreateStringCol(colName);           break;
+            case DetColumnKind.Byte:   table.CreateColumn(colName, DetType.Byte);   break;
+            case DetColumnKind.Int:    table.CreateColumn(colName, DetType.Int);    break;
+            case DetColumnKind.Fix64:  table.CreateColumn(colName, DetType.Fix64);  break;
+            case DetColumnKind.String: table.CreateStringColumn(colName);           break;
             default: throw new InvalidDataException($"Unknown col kind: {(byte)kind}");
         }
     }

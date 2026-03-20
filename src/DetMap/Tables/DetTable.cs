@@ -4,18 +4,18 @@ namespace DetMap.Tables;
 
 public sealed class DetTable
 {
-    private readonly DetCol<byte> _alive;
+    private readonly DetColumn<byte> _alive;
     private readonly Stack<int> _freeList = new();
     private int _highWater;
-    private readonly Dictionary<string, IDetColData> _cols = new();
-    private readonly List<string> _colOrder = new();
+    private readonly Dictionary<string, IDetColumnData> _columns = new();
+    private readonly List<string> _columnOrder = new();
 
     public string Name { get; }
 
     public DetTable(string name, int capacity = 256)
     {
         Name = name;
-        _alive = new DetCol<byte>(capacity);
+        _alive = new DetColumn<byte>(capacity);
     }
 
     public int Insert()
@@ -34,27 +34,27 @@ public sealed class DetTable
     public bool Exists(int id) => _alive.Get(id) == 1;
 
     /// <param name="type">Use <see cref="DetType.Byte"/>, <see cref="DetType.Int"/>, or <see cref="DetType.Fix64"/>.</param>
-    public DetCol<T> CreateCol<T>(string name, DetType<T> type) where T : unmanaged
+    public DetColumn<T> CreateColumn<T>(string name, DetType<T> type) where T : unmanaged
     {
-        var col = new DetCol<T>(Math.Max(_highWater, 64));
-        _cols[name] = col;
-        _colOrder.Add(name);
-        return col;
+        var column = new DetColumn<T>(Math.Max(_highWater, 64));
+        _columns[name] = column;
+        _columnOrder.Add(name);
+        return column;
     }
 
-    public DetStringCol CreateStringCol(string name)
+    public DetStringColumn CreateStringColumn(string name)
     {
-        var col = new DetStringCol(Math.Max(_highWater, 64));
-        _cols[name] = col;
-        _colOrder.Add(name);
-        return col;
+        var column = new DetStringColumn(Math.Max(_highWater, 64));
+        _columns[name] = column;
+        _columnOrder.Add(name);
+        return column;
     }
 
-    public DetCol<T>    GetCol<T>(string name)      where T : unmanaged => (DetCol<T>)_cols[name];
-    public DetStringCol GetStringCol(string name)   => (DetStringCol)_cols[name];
+    public DetColumn<T> GetColumn<T>(string name) where T : unmanaged => (DetColumn<T>)_columns[name];
+    public DetStringColumn GetStringColumn(string name) => (DetStringColumn)_columns[name];
 
     /// <summary>Iterate alive entities in deterministic order (0..highWater).</summary>
-    public IEnumerable<int> GetAlive()
+    public IEnumerable<int> GetAliveIds()
     {
         for (int i = 0; i < _highWater; i++)
             if (_alive.Get(i) == 1) yield return i;
@@ -63,10 +63,10 @@ public sealed class DetTable
     public int HighWater => _highWater;
 
     /// <summary>Column names in insertion order — used for deterministic serialization.</summary>
-    public IReadOnlyList<string> ColOrder => _colOrder;
+    public IReadOnlyList<string> ColumnOrder => _columnOrder;
 
-    /// <summary>Access a column by name as <see cref="IDetColData"/> for schema-driven serialization.</summary>
-    public IDetColData GetColData(string name) => _cols[name];
+    /// <summary>Access a column by name as <see cref="IDetColumnData"/> for schema-driven serialization.</summary>
+    public IDetColumnData GetColumnData(string name) => _columns[name];
 
     public void WriteDataToStream(BinaryWriter bw)
     {
@@ -79,8 +79,8 @@ public sealed class DetTable
 
         _alive.WriteToStream(bw);
 
-        foreach (var name in _colOrder)
-            _cols[name].WriteToStream(bw);
+        foreach (var name in _columnOrder)
+            _columns[name].WriteToStream(bw);
     }
 
     public void ReadDataFromStream(BinaryReader br)
@@ -96,7 +96,7 @@ public sealed class DetTable
 
         _alive.ReadFromStream(br);
 
-        foreach (var name in _colOrder)
-            _cols[name].ReadFromStream(br);
+        foreach (var name in _columnOrder)
+            _columns[name].ReadFromStream(br);
     }
 }

@@ -18,11 +18,11 @@ public class DeterminismTests
     {
         var map = new DetMap.Core.DetMap(32, 32);
 
-        var building = map.Grid.CreateLayer("building", DetType.Int);
-        var height   = map.Grid.CreateLayer("height",   DetType.Fix64);
+        var building = map.Grid.CreateValueLayer("building", DetType.Int);
+        var height   = map.Grid.CreateValueLayer("height",   DetType.Fix64);
         var walkable = map.Grid.CreateBitLayer("walkable");
-        var units    = map.Grid.CreateEntityMap("units");
-        var services = map.Grid.CreateTagMap("services");
+        var units    = map.Grid.CreateEntityLayer("units");
+        var services = map.Grid.CreateTagLayer("services");
 
         walkable.SetAll(true);
 
@@ -30,13 +30,13 @@ public class DeterminismTests
         map.SetGlobal("population", Fix64.FromInt(0));
 
         var chars   = map.CreateTable("characters");
-        var nameCol = chars.CreateStringCol("name");
-        var jobCol  = chars.CreateCol("job", DetType.Byte);
-        var pathCol = new DetPathCol(64);
+        var nameCol = chars.CreateStringColumn("name");
+        var jobCol  = chars.CreateColumn("job", DetType.Byte);
+        var pathStore = map.CreatePathStore("unitPaths");
 
         // Place buildings
-        var house  = new BuildingDef("house",  2, 2, Fix64.FromInt(1));
-        var market = new BuildingDef("market", 3, 2, Fix64.FromInt(2));
+        var house  = new BuildingDefinition("house",  2, 2, 1);
+        var market = new BuildingDefinition("market", 3, 2, 2);
         BuildingPlacer.Place(map.Grid, 0,  0, house,  building, walkable);
         BuildingPlacer.Place(map.Grid, 10, 5, market, building, walkable);
 
@@ -64,7 +64,7 @@ public class DeterminismTests
         for (int id = 0; id < 8; id++)
         {
             var path = pf.FindPath(id * 2, id % 4, 20, 20, walkable);
-            pathCol.Set(id, path);
+            pathStore.Set(id, path);
         }
 
         for (int tick = 0; tick < 5; tick++)
@@ -74,7 +74,7 @@ public class DeterminismTests
             for (int id = 0; id < 8; id++)
             {
                 if (!chars.Exists(id)) continue;
-                ref DetPath p = ref pathCol.Get(id);
+                ref DetPath p = ref pathStore.Get(id);
                 if (!p.IsValid || p.IsComplete) continue;
                 p.Advance();
                 var (nx, ny) = p.Current(32);
@@ -109,8 +109,8 @@ public class DeterminismTests
     {
         var map1 = BuildAndSimulate();
         var map2 = BuildAndSimulate();
-        var b1 = map1.Grid.Layer<int>("building");
-        var b2 = map2.Grid.Layer<int>("building");
+        var b1 = map1.Grid.GetValueLayer<int>("building");
+        var b2 = map2.Grid.GetValueLayer<int>("building");
         for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++)
             Assert.Equal(b1.Get(x, y), b2.Get(x, y));
@@ -121,8 +121,8 @@ public class DeterminismTests
     {
         var map1 = BuildAndSimulate();
         var map2 = BuildAndSimulate();
-        var h1 = map1.Grid.Layer<Fix64>("height");
-        var h2 = map2.Grid.Layer<Fix64>("height");
+        var h1 = map1.Grid.GetValueLayer<Fix64>("height");
+        var h2 = map2.Grid.GetValueLayer<Fix64>("height");
         for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++)
             Assert.Equal(h1.Get(x, y).RawValue, h2.Get(x, y).RawValue);
@@ -133,8 +133,8 @@ public class DeterminismTests
     {
         var map1 = BuildAndSimulate();
         var map2 = BuildAndSimulate();
-        var w1 = map1.Grid.Structure<DetBitLayer>("walkable");
-        var w2 = map2.Grid.Structure<DetBitLayer>("walkable");
+        var w1 = map1.Grid.GetBitLayer("walkable");
+        var w2 = map2.Grid.GetBitLayer("walkable");
         for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++)
             Assert.Equal(w1.Get(x, y), w2.Get(x, y));
@@ -145,8 +145,8 @@ public class DeterminismTests
     {
         var map1 = BuildAndSimulate();
         var map2 = BuildAndSimulate();
-        var u1 = map1.Grid.Structure<DetEntityMap>("units");
-        var u2 = map2.Grid.Structure<DetEntityMap>("units");
+        var u1 = map1.Grid.GetEntityLayer("units");
+        var u2 = map2.Grid.GetEntityLayer("units");
         for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++)
             Assert.Equal(u1.CountAt(x, y), u2.CountAt(x, y));

@@ -46,7 +46,7 @@ public class DetTableTests
     public void Column_SetGet_RoundTrips()
     {
         var table = new DetTable("chars");
-        var jobCol = table.CreateCol("job", DetType.Byte);
+        var jobCol = table.CreateColumn("job", DetType.Byte);
         int id = table.Insert();
         jobCol.Set(id, 3);
         Assert.Equal(3, jobCol.Get(id));
@@ -56,14 +56,14 @@ public class DetTableTests
     public void StringColumn_SetGet_RoundTrips()
     {
         var table = new DetTable("chars");
-        var nameCol = table.CreateStringCol("name");
+        var nameCol = table.CreateStringColumn("name");
         int id = table.Insert();
         nameCol.Set(id, "Somchai");
         Assert.Equal("Somchai", nameCol.Get(id));
     }
 
     [Fact]
-    public void GetAlive_IteratesInDeterministicOrder()
+    public void GetAliveIds_IteratesInDeterministicOrder()
     {
         var table = new DetTable("chars");
         int a = table.Insert();
@@ -71,7 +71,7 @@ public class DetTableTests
         int c = table.Insert();
         table.Delete(b);
 
-        var alive = table.GetAlive().ToList();
+        var alive = table.GetAliveIds().ToList();
         Assert.Equal(new[] { a, c }, alive);
     }
 
@@ -89,22 +89,22 @@ public class DetTableTests
     }
 
     [Fact]
-    public void GetCol_RetrievesColumnByName()
+    public void GetColumn_RetrievesColumnByName()
     {
         var table = new DetTable("chars");
-        var added = table.CreateCol("job", DetType.Byte);
-        var retrieved = table.GetCol<byte>("job");
+        var added = table.CreateColumn("job", DetType.Byte);
+        var retrieved = table.GetColumn<byte>("job");
         int id = table.Insert();
         retrieved.Set(id, 7);
         Assert.Equal(7, added.Get(id));
     }
 
     [Fact]
-    public void GetStringCol_RetrievesColumnByName()
+    public void GetStringColumn_RetrievesColumnByName()
     {
         var table = new DetTable("chars");
-        var added = table.CreateStringCol("name");
-        var retrieved = table.GetStringCol("name");
+        var added = table.CreateStringColumn("name");
+        var retrieved = table.GetStringColumn("name");
         int id = table.Insert();
         retrieved.Set(id, "Test");
         Assert.Equal("Test", added.Get(id));
