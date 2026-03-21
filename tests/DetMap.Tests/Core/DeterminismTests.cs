@@ -14,14 +14,14 @@ namespace DetMap.Tests.Core;
 /// </summary>
 public class DeterminismTests
 {
-    private static DetMap.Core.DetMap BuildAndSimulate()
+    private static DetSpatialDatabase BuildAndSimulate()
     {
-        var map = new DetMap.Core.DetMap(32, 32);
+        var map = new DetSpatialDatabase(32, 32);
 
         var building = map.Grid.CreateValueLayer("building", DetType.Int);
         var height   = map.Grid.CreateValueLayer("height",   DetType.Fix64);
-        var walkable = map.Grid.CreateBitLayer("walkable");
-        var units    = map.Grid.CreateEntityLayer("units");
+        var walkable = map.Grid.CreateBooleanLayer("walkable");
+        var units    = map.Grid.CreateCellIndex("units");
         var services = map.Grid.CreateTagLayer("services");
 
         walkable.SetAll(true);
@@ -50,13 +50,13 @@ public class DeterminismTests
         for (int x = 5; x < 10; x++)
             services.AddTag(x, y, "market");
 
-        // Spawn entities
+        // Create rows and place them
         for (int i = 0; i < 8; i++)
         {
-            int id = chars.Insert();
+            int id = chars.CreateRow();
             nameCol.Set(id, $"Unit{i}");
             jobCol.Set(id, (byte)(i % 3));
-            units.Add(id, i * 2, i % 4);
+            units.Place(id, i * 2, i % 4);
         }
 
         // Pathfind and simulate 5 ticks
@@ -73,12 +73,12 @@ public class DeterminismTests
 
             for (int id = 0; id < 8; id++)
             {
-                if (!chars.Exists(id)) continue;
+                if (!chars.RowExists(id)) continue;
                 ref DetPath p = ref pathStore.Get(id);
                 if (!p.IsValid || p.IsComplete) continue;
                 p.Advance();
                 var (nx, ny) = p.Current(32);
-                units.Move(id, nx, ny);
+                units.MoveTo(id, nx, ny);
             }
 
             map.SetGlobal("population", Fix64.FromInt(chars.HighWater));
@@ -133,20 +133,20 @@ public class DeterminismTests
     {
         var map1 = BuildAndSimulate();
         var map2 = BuildAndSimulate();
-        var w1 = map1.Grid.GetBitLayer("walkable");
-        var w2 = map2.Grid.GetBitLayer("walkable");
+        var w1 = map1.Grid.GetBooleanLayer("walkable");
+        var w2 = map2.Grid.GetBooleanLayer("walkable");
         for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++)
             Assert.Equal(w1.Get(x, y), w2.Get(x, y));
     }
 
     [Fact]
-    public void SimulationEntityPositions_SameInputTwice_IdenticalCounts()
+    public void SimulationCellIndexCounts_SameInputTwice_IdenticalCounts()
     {
         var map1 = BuildAndSimulate();
         var map2 = BuildAndSimulate();
-        var u1 = map1.Grid.GetEntityLayer("units");
-        var u2 = map2.Grid.GetEntityLayer("units");
+        var u1 = map1.Grid.GetCellIndex("units");
+        var u2 = map2.Grid.GetCellIndex("units");
         for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++)
             Assert.Equal(u1.CountAt(x, y), u2.CountAt(x, y));
@@ -155,7 +155,7 @@ public class DeterminismTests
     [Fact]
     public void SimulationPath_SameInputTwice_IdenticalRoute()
     {
-        var walkable = new DetBitLayer("walkable", 32, 32);
+        var walkable = new DetBooleanLayer("walkable", 32, 32);
         walkable.SetAll(true);
         // Wall at y=10, x=5..20
         for (int x = 5; x <= 20; x++) walkable.Set(x, 10, false);

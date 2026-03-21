@@ -6,9 +6,9 @@ namespace DetMap.Tests.Pathfinding;
 
 public class DetPathfinderTests
 {
-    private static DetBitLayer AllWalkable(int w, int h)
+    private static DetBooleanLayer AllWalkable(int w, int h)
     {
-        var layer = new DetBitLayer("walkable", w, h);
+        var layer = new DetBooleanLayer("walkable", w, h);
         layer.SetAll(true);
         return layer;
     }

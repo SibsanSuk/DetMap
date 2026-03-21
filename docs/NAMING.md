@@ -2,90 +2,118 @@
 
 This document defines the target public API naming for DetMap.
 
-It is intentionally opinionated.
+DetMap is a deterministic spatial database.
 
-- one concept uses one word
-- one category uses one suffix
-- one action uses one verb
-- public API favors clarity over shorthand
+The naming should help developers think in terms of:
 
-This guide does not preserve legacy naming. Old names are not part of the target design.
+- database state
+- 2D grid data
+- searchable records
+- explicit indexes and stores
+
+It should not force users to think in terms of engine internals.
 
 ## Design Principles
 
-DetMap naming should follow `KISS` and support `SOLID`.
+DetMap naming follows two simple rules.
 
-### KISS
+### 1. Prefer database words for inspectable state
 
-- Prefer the simplest name that is still precise.
-- Do not keep two words for the same concept.
-- Do not require users to learn project-specific jargon when plain words work.
-- If a user cannot guess what something is from the name, the name is wrong.
-
-### SOLID
-
-Naming is not architecture by itself, but good naming should reinforce good design.
-
-- `SRP`: a type name should describe one responsibility.
-- `OCP`: new APIs should extend an existing naming family instead of inventing a new pattern.
-- `LSP`: related APIs should behave consistently enough that their names remain trustworthy.
-- `ISP`: interface names should describe the smallest useful capability, not a vague umbrella.
-- `DIP`: public abstractions should be named by role and behavior, not storage detail.
-
-## Core Vocabulary
-
-DetMap uses these words as canonical public concepts.
-
-### `Map`
-
-`Map` is reserved for the top-level simulation object.
+If humans will browse it in a table, search it, edit it, or diff it, use database vocabulary.
 
 Examples:
 
-- `DetMap`
+- `Database`
+- `Table`
+- `Column`
+- `Row`
+- `Index`
+- `Store`
+- `Snapshot`
+- `CommandBatch`
 
-Do not use `Map` for grid-backed helper types like entity occupancy, tags, or flow data.
+### 2. Use spatial words only where space actually matters
+
+Use spatial vocabulary for grid-native concepts.
+
+Examples:
+
+- `Grid`
+- `Cell`
+- `Layer`
+- `Region`
+- `Bounds`
+
+## Canonical Public Vocabulary
+
+### `Database`
+
+`Database` is the top-level runtime state container.
+
+Canonical type:
+
+- `DetSpatialDatabase`
+
+Use `Database` for the root state object, not `Map`.
+
+`DetMap` remains the project name and assembly name.
 
 ### `Grid`
 
-`Grid` means the spatial registry of layers and map dimensions.
+`Grid` is the registry of cell-based data and dimensions.
 
-Examples:
+Canonical type:
 
 - `DetGrid`
 
 ### `Layer`
 
-`Layer` means data attached to grid cells.
+`Layer` means dense cell-attached data.
 
-Canonical public layer types:
+Canonical types:
 
 - `DetValueLayer<T>`
-- `DetBitLayer`
-- `DetEntityLayer`
+- `DetBooleanLayer`
 - `DetTagLayer`
 - `DetFlowLayer`
 
-All grid-backed public types should use the `Layer` family. Do not introduce public `Map`, `Field`, or `Structure` names for grid-backed data.
+Use `Layer` when the value is conceptually attached to cells and likely exists for most or all cells.
+
+### `Index`
+
+`Index` means a structure that accelerates query and should not be mistaken for the main human-facing source of truth.
+
+Canonical type:
+
+- `DetCellIndex`
+
+Use `Index` when the structure primarily answers lookup questions such as:
+
+- which row ids are in this cell
+- how many row ids are in this cell
+
+Do not use `Layer` for an index.
 
 ### `Table`
 
-`Table` means row-oriented entity storage keyed by entity id.
+`Table` means sparse row-based state keyed by row id.
 
-Examples:
+Canonical type:
 
 - `DetTable`
 
+Tables are the primary inspection surface for gameplay state.
+
 ### `Column`
 
-`Column` means schema data belonging to a `Table`.
+`Column` means schema data that belongs to a table.
 
-Canonical public column types:
+Canonical types:
 
 - `DetColumn<T>`
 - `DetStringColumn`
 
-Public methods should use:
+Public methods:
 
 - `CreateColumn`
 - `GetColumn`
@@ -94,330 +122,199 @@ Public methods should use:
 
 Do not use `Col` in public API.
 
-### `Store`
+### `Row`
 
-`Store` means sidecar data keyed by entity id but not part of the table schema.
+`Row` is the public term for one record in a table.
 
-Examples:
+Use row-centric verbs:
 
-- `DetPathStore`
+- `CreateRow`
+- `DeleteRow`
+- `RowExists`
+- `GetRowIds`
 
-Use a `Column` when the data is a normal entity attribute.
-
-Use a `Store` when the data is subsystem-owned state that is better modeled outside the row schema.
-
-Examples:
-
-- `hp`, `job`, `posX`, `posY` -> `Column`
-- `current path` -> `Store`
-
-### `Definition`
-
-`Definition` means immutable configuration or design-time data.
-
-More specifically, a `Definition` is an immutable design-time description shared by many runtime instances.
-
-Examples:
-
-- `BuildingDefinition`
-
-`Definition` is not per-instance runtime state.
-
-Do not use `Def` in public API.
-
-### `Query`
-
-`Query` means a read-only search or selection operation.
-
-Examples:
-
-- `QueryEngine`
-- `RectQuery`
-- `RadiusQuery`
-
-## Public API Rules
-
-### 1. Public names use full words
-
-Use full words unless the abbreviation is universally standard.
-
-Allowed:
-
-- `Id`
-
-Avoid:
-
-- `Col`
-- `Def`
-- `Info`
-- `Mgr`
-- `Struct`
-
-### 2. One family, one suffix
-
-Use one suffix per concept:
-
-- grid-backed data -> `Layer`
-- row storage -> `Table`
-- row field -> `Column`
-- sidecar entity data -> `Store`
-- immutable config -> `Definition`
-- read-only searching -> `Query`
-
-If a new type does not fit one of these families, its role is probably still unclear.
-
-### 3. Creation and retrieval always use verbs
-
-Factories use `CreateX`.
-
-Retrieval uses `GetX`.
-
-Do not use bare noun accessors.
-
-Good:
-
-- `CreateEntityLayer`
-- `GetEntityLayer`
-- `CreateColumn`
-- `GetColumn`
-
-Avoid:
-
-- `Structure<T>`
-- `Layer<T>()` as a getter name
-- `Table()` as a getter name
-
-### 4. Checks use fixed words
-
-Use one word per type of question:
-
-- `Exists` for identity or row existence
-- `Has` for a property, tag, flag, or capability
-- `Contains` for membership or spatial inclusion
-
-Examples:
-
-- `table.Exists(id)`
-- `tagLayer.HasTag(x, y, "market")`
-- `dirtyRegion.Contains(x, y)`
-
-Do not treat `Exists`, `Has`, and `Contains` as interchangeable.
-
-### 5. Enumeration names say what they enumerate
-
-Examples:
-
-- `GetAliveIds`
-- `GetEntitiesAt`
-- `GetTagsAt`
-
-Avoid short names that hide the returned concept.
-
-Examples to avoid:
-
-- `GetAlive`
-- `GetAll`
-- `Items`
-
-### 6. Names should describe role, not implementation
-
-Prefer names that describe what the type is for.
-
-Good:
-
-- `DetEntityLayer`
-- `DetPathStore`
-- `BuildingDefinition`
-
-Avoid:
-
-- `Structure`
-- `LinkedEntityMap`
-- `RawPathSlots`
-
-Implementation details may still appear in private code when useful.
-
-## Canonical Public API Shape
-
-### Grid
-
-Public grid creation methods:
-
-- `CreateValueLayer<T>(name, type, defaultValue = default)`
-- `CreateBitLayer(name)`
-- `CreateEntityLayer(name)`
-- `CreateTagLayer(name)`
-- `CreateFlowLayer(name)`
-
-Public grid retrieval methods:
-
-- `GetValueLayer<T>(name)`
-- `GetBitLayer(name)`
-- `GetEntityLayer(name)`
-- `GetTagLayer(name)`
-- `GetFlowLayer(name)`
-
-`Grid` should not expose public retrieval via `Structure<T>()` or other noun-only accessors.
-
-### Table
-
-Public table methods:
+Do not use:
 
 - `Insert`
 - `Delete`
 - `Exists`
-- `GetAliveIds`
-- `CreateColumn`
-- `GetColumn`
-- `CreateStringColumn`
-- `GetStringColumn`
 
-### Query delegates
+These names are too storage-centric or too ambiguous in a DB-first API.
 
-Per-cell boolean delegates should use one shared name:
+### `Store`
 
-- `CellPredicate`
+`Store` means sidecar data keyed by row id but not modeled as normal schema columns.
 
-Do not introduce synonyms like `CellFilter` for the same concept.
+Canonical type:
 
-## Canonical Renames
+- `DetPathStore`
 
-These names define the target direction.
+Use a store when the data is subsystem-owned, variable-sized, or cache-like.
 
-| Reject | Use |
-| --- | --- |
-| `DetLayer<T>` | `DetValueLayer<T>` |
-| `DetEntityMap` | `DetEntityLayer` |
-| `DetTagMap` | `DetTagLayer` |
-| `DetFlowField` | `DetFlowLayer` |
-| `DetCol<T>` | `DetColumn<T>` |
-| `DetStringCol` | `DetStringColumn` |
-| `CreateCol` | `CreateColumn` |
-| `GetCol` | `GetColumn` |
-| `GetAlive` | `GetAliveIds` |
-| `Structure<T>()` | `GetX` retrieval methods |
-| `BuildingDef` | `BuildingDefinition` |
-| `BuildingId` | `BuildingTypeId` or `TileValue` |
-| `CellFilter` | `CellPredicate` |
-| `LayerType` | remove |
+Examples:
 
-## Enum Direction
+- `current path` -> `Store`
+- `hp` -> `Column`
+- `destinationX` -> `Column`
 
-`DetLayerKind` should classify public API families, not mix internal representation and domain language.
+### `Snapshot`
 
-Canonical direction:
+`Snapshot` means a serialized point-in-time image of the database.
 
-- `ValueByte`
-- `ValueInt`
-- `ValueFix64`
-- `Bit`
+Canonical type:
+
+- `DetSnapshot`
+
+### `CommandBatch`
+
+`CommandBatch` means an ordered set of deferred mutations that can be applied at a safe simulation boundary.
+
+Canonical type:
+
+- `DetCommandBatch`
+
+### `Definition`
+
+`Definition` means immutable design-time data shared by many runtime instances.
+
+Canonical type:
+
+- `BuildingDefinition`
+
+Do not use `Def` in public API.
+
+## Public API Shape
+
+### Root Object
+
+Good:
+
+- `new DetSpatialDatabase(width, height)`
+- `DetSpatialDatabase.FromBytes(data)`
+- `database.Apply(batch)`
+
+Avoid:
+
+- `new DetMap(...)` as the public root type name
+
+### Grid
+
+Good:
+
+- `CreateValueLayer`
+- `CreateBooleanLayer`
+- `CreateCellIndex`
+- `CreateTagLayer`
+- `CreateFlowLayer`
+- `GetValueLayer`
+- `GetBooleanLayer`
+- `GetCellIndex`
+- `GetTagLayer`
+- `GetFlowLayer`
+
+Avoid:
+
+- `CreateBitLayer`
+- `CreateEntityLayer`
+- noun-only getters
+
+### Cell Index
+
+Good:
+
+- `Place(rowId, x, y)`
+- `MoveTo(rowId, x, y)`
+- `Remove(rowId)`
+- `CountAt(x, y)`
+- `GetRowIdsAt(x, y)`
+
+Avoid:
+
+- `Add(entityId, x, y)`
+- `Move(entityId, x, y)`
+- `GetEntitiesAt`
+
+The index is indexing rows, not gameplay entities as a special category.
+
+### Table
+
+Good:
+
+- `CreateRow()`
+- `DeleteRow(id)`
+- `RowExists(id)`
+- `GetRowIds()`
+- `PeekNextRowId()`
+
+Avoid:
+
+- `Insert()`
+- `Delete(id)`
+- `Exists(id)`
+- `GetAliveIds()`
+
+`GetRowIds()` is clearer because the table is not necessarily storing "alive" game entities. It may also store jobs, events, requests, or leaderboard rows.
+
+### Snapshot and Commands
+
+Good:
+
+- `DetSnapshot.Serialize(database)`
+- `DetSnapshot.Deserialize(data)`
+- `DetCommandBatch`
+
+Avoid:
+
+- bare `Snapshot` as the public type name
+- delegate-based mutation queues for lockstep edits
+
+## Checks and Verbs
+
+Use one verb per kind of action.
+
+- creation: `Create`
+- retrieval: `Get`
+- deletion: `Delete`
+- placement into a cell index: `Place`
+- movement within a cell index: `MoveTo`
+
+Use one word per kind of question.
+
+- `RowExists` for table row identity
+- `Has` for tags, flags, or properties
+- `Contains` for membership or region inclusion
+
+## Terms To Avoid
+
+Avoid these in the public API unless the domain truly requires them:
+
 - `Entity`
-- `Tag`
-- `Flow`
+- `Spawn`
+- `Character`
+- `Unit`
+- `Col`
+- `Def`
+- `Map` for the root state object
 
-## Before / After
+These words either skew too game-specific, too abbreviated, or too implementation-driven.
 
-### Grid-backed data
+## Summary
 
-Reject:
+DetMap public naming should read like a spatial database:
 
-```csharp
-var units = map.Grid.CreateEntityMap("units");
-var unitMap = map.Grid.Structure<DetEntityMap>("units");
-```
+- `DetSpatialDatabase`
+- `DetGrid`
+- `DetTable`
+- `DetColumn<T>`
+- `DetValueLayer<T>`
+- `DetBooleanLayer`
+- `DetCellIndex`
+- `DetPathStore`
+- `DetSnapshot`
+- `DetCommandBatch`
 
-Use:
+The main rule is simple:
 
-```csharp
-var units = map.Grid.CreateEntityLayer("units");
-var unitLayer = map.Grid.GetEntityLayer("units");
-```
-
-### Dense value layers
-
-Reject:
-
-```csharp
-var height = map.Grid.CreateLayer("height", DetType.Fix64);
-var heightLayer = map.Grid.Layer<Fix64>("height");
-```
-
-Use:
-
-```csharp
-var height = map.Grid.CreateValueLayer("height", DetType.Fix64);
-var heightLayer = map.Grid.GetValueLayer<Fix64>("height");
-```
-
-### Table schema
-
-Reject:
-
-```csharp
-var workers = map.CreateTable("workers");
-var hpCol = workers.CreateCol("hp", DetType.Int);
-var jobCol = workers.GetCol<byte>("job");
-```
-
-Use:
-
-```csharp
-var workers = map.CreateTable("workers");
-DetColumn<int> hpColumn = workers.CreateColumn("hp", DetType.Int);
-DetColumn<byte> jobColumn = workers.GetColumn<byte>("job");
-```
-
-### Definitions
-
-Reject:
-
-```csharp
-var house = new BuildingDef("house", 2, 2, Fix64.FromInt(1));
-```
-
-Use:
-
-```csharp
-var house = new BuildingDefinition("house", 2, 2, 1);
-```
-
-### Column vs store
-
-Use a `Column` for normal entity attributes:
-
-```csharp
-var hpColumn = workers.CreateColumn("hp", DetType.Int);
-var posXColumn = workers.CreateColumn("posX", DetType.Int);
-```
-
-Use a `Store` for subsystem-owned sidecar state:
-
-```csharp
-var workerPaths = map.CreatePathStore("workerPaths");
-```
-
-The name should tell the user whether the data belongs to the entity record or to a supporting subsystem.
-
-## Review Checklist
-
-When adding a new public API, check:
-
-1. Is this a `Map`, `Grid`, `Layer`, `Table`, `Column`, `Store`, `Definition`, or `Query`?
-2. Is the chosen word already the canonical word for that concept?
-3. Can a new user guess how to create and retrieve it?
-4. Can a new user tell whether the data lives on the grid, in a row schema, or in sidecar state?
-5. Does the name describe behavior and responsibility rather than storage detail?
-
-If the answer to any of `2` through `5` is "no", rename it before merging.
-
-## Non-Goals
-
-This guide does not require private symbols to use the full public vocabulary.
-
-Short private names are acceptable when:
-
-- they are private
-- their meaning is obvious in local context
-- they do not leak into public API, public docs, or examples
-
-The main target is a public API that is simple, predictable, and internally consistent.
+- inspectable truth uses database words
+- dense cell data uses layer words
+- query helpers use index words

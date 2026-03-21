@@ -1,4 +1,5 @@
 using DetMap.Core;
+using DetMap.Schema;
 
 namespace DetMap.Tables;
 
@@ -18,20 +19,23 @@ public sealed class DetTable
         _alive = new DetColumn<byte>(capacity);
     }
 
-    public int Insert()
+    public int CreateRow()
     {
         int id = _freeList.Count > 0 ? _freeList.Pop() : _highWater++;
         _alive.Set(id, 1);
         return id;
     }
 
-    public void Delete(int id)
+    public int PeekNextRowId()
+        => _freeList.Count > 0 ? _freeList.Peek() : _highWater;
+
+    public void DeleteRow(int id)
     {
         _alive.Set(id, 0);
         _freeList.Push(id);
     }
 
-    public bool Exists(int id) => _alive.Get(id) == 1;
+    public bool RowExists(int id) => _alive.Get(id) == 1;
 
     /// <param name="type">Use <see cref="DetType.Byte"/>, <see cref="DetType.Int"/>, or <see cref="DetType.Fix64"/>.</param>
     public DetColumn<T> CreateColumn<T>(string name, DetType<T> type) where T : unmanaged
@@ -53,8 +57,8 @@ public sealed class DetTable
     public DetColumn<T> GetColumn<T>(string name) where T : unmanaged => (DetColumn<T>)_columns[name];
     public DetStringColumn GetStringColumn(string name) => (DetStringColumn)_columns[name];
 
-    /// <summary>Iterate alive entities in deterministic order (0..highWater).</summary>
-    public IEnumerable<int> GetAliveIds()
+    /// <summary>Iterate existing rows in deterministic order (0..highWater).</summary>
+    public IEnumerable<int> GetRowIds()
     {
         for (int i = 0; i < _highWater; i++)
             if (_alive.Get(i) == 1) yield return i;
@@ -67,6 +71,18 @@ public sealed class DetTable
 
     /// <summary>Access a column by name as <see cref="IDetColumnData"/> for schema-driven serialization.</summary>
     public IDetColumnData GetColumnData(string name) => _columns[name];
+
+    public DetTableSchema GetSchema()
+    {
+        var columns = new DetColumnSchema[_columnOrder.Count];
+        for (int i = 0; i < _columnOrder.Count; i++)
+        {
+            string name = _columnOrder[i];
+            columns[i] = new DetColumnSchema(name, _columns[name].Kind);
+        }
+
+        return new DetTableSchema(Name, columns);
+    }
 
     public void WriteDataToStream(BinaryWriter bw)
     {

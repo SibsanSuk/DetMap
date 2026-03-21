@@ -1,4 +1,5 @@
 using DetMap.Layers;
+using DetMap.Schema;
 
 namespace DetMap.Core;
 
@@ -8,6 +9,7 @@ public sealed class DetGrid
     public readonly int Height;
 
     private readonly Dictionary<string, IDetLayer> _layers = new();
+    private readonly List<string> _layerOrder = new();
 
     public DetGrid(int width, int height)
     {
@@ -21,20 +23,23 @@ public sealed class DetGrid
     {
         var layer = new DetValueLayer<T>(name, Width, Height, defaultValue);
         _layers[name] = layer;
+        AddLayerName(name);
         return layer;
     }
 
-    public DetBitLayer CreateBitLayer(string name)
+    public DetBooleanLayer CreateBooleanLayer(string name)
     {
-        var layer = new DetBitLayer(name, Width, Height);
+        var layer = new DetBooleanLayer(name, Width, Height);
         _layers[name] = layer;
+        AddLayerName(name);
         return layer;
     }
 
-    public DetEntityLayer CreateEntityLayer(string name)
+    public DetCellIndex CreateCellIndex(string name)
     {
-        var layer = new DetEntityLayer(name, Width, Height);
+        var layer = new DetCellIndex(name, Width, Height);
         _layers[name] = layer;
+        AddLayerName(name);
         return layer;
     }
 
@@ -42,6 +47,7 @@ public sealed class DetGrid
     {
         var layer = new DetTagLayer(name, Width, Height);
         _layers[name] = layer;
+        AddLayerName(name);
         return layer;
     }
 
@@ -49,17 +55,18 @@ public sealed class DetGrid
     {
         var layer = new DetFlowLayer(name, Width, Height);
         _layers[name] = layer;
+        AddLayerName(name);
         return layer;
     }
 
     public DetValueLayer<T> GetValueLayer<T>(string name) where T : unmanaged
         => (DetValueLayer<T>)_layers[name];
 
-    public DetBitLayer GetBitLayer(string name)
-        => (DetBitLayer)_layers[name];
+    public DetBooleanLayer GetBooleanLayer(string name)
+        => (DetBooleanLayer)_layers[name];
 
-    public DetEntityLayer GetEntityLayer(string name)
-        => (DetEntityLayer)_layers[name];
+    public DetCellIndex GetCellIndex(string name)
+        => (DetCellIndex)_layers[name];
 
     public DetTagLayer GetTagLayer(string name)
         => (DetTagLayer)_layers[name];
@@ -68,7 +75,26 @@ public sealed class DetGrid
         => (DetFlowLayer)_layers[name];
 
     public IReadOnlyDictionary<string, IDetLayer> AllLayers => _layers;
+    public IReadOnlyList<string> LayerOrder => _layerOrder;
 
     public bool InBounds(int x, int y)
         => (uint)x < (uint)Width && (uint)y < (uint)Height;
+
+    public IReadOnlyList<DetLayerSchema> GetLayerSchemas()
+    {
+        var schemas = new DetLayerSchema[_layerOrder.Count];
+        for (int i = 0; i < _layerOrder.Count; i++)
+        {
+            string name = _layerOrder[i];
+            schemas[i] = new DetLayerSchema(name, _layers[name].Kind);
+        }
+
+        return schemas;
+    }
+
+    private void AddLayerName(string name)
+    {
+        if (!_layerOrder.Contains(name))
+            _layerOrder.Add(name);
+    }
 }

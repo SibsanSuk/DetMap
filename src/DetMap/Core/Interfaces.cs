@@ -5,8 +5,8 @@ public enum DetLayerKind : byte
     ValueByte = 0,
     ValueInt  = 1,
     ValueFix64 = 2,
-    Bit = 3,
-    Entity = 4,
+    Boolean = 3,
+    CellIndex = 4,
     Tag = 5,
     Flow = 6,
 }

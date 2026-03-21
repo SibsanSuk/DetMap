@@ -1,8 +1,8 @@
 namespace DetMap.Pathfinding;
 
 /// <summary>
-/// Stores one <see cref="DetPath"/> per entity ID — a named, DB-level structure
-/// that is serialized by <c>Snapshot</c> alongside layers and tables.
+/// Stores one <see cref="DetPath"/> per row ID — a named, DB-level structure
+/// that is serialized by <c>DetSnapshot</c> alongside layers and tables.
 /// </summary>
 public sealed class DetPathStore
 {
@@ -16,29 +16,29 @@ public sealed class DetPathStore
         _paths = new DetPath[capacity];
     }
 
-    public void Set(int entityId, DetPath path)
+    public void Set(int rowId, DetPath path)
     {
-        EnsureCapacity(entityId);
-        _paths[entityId] = path;
+        EnsureCapacity(rowId);
+        _paths[rowId] = path;
     }
 
     /// <summary>Returns a ref to the stored path — modify in-place without copying.</summary>
-    public ref DetPath Get(int entityId)
+    public ref DetPath Get(int rowId)
     {
-        EnsureCapacity(entityId);
-        return ref _paths[entityId];
+        EnsureCapacity(rowId);
+        return ref _paths[rowId];
     }
 
-    public void Clear(int entityId)
+    public void Clear(int rowId)
     {
-        if (entityId < _paths.Length)
-            _paths[entityId] = default;
+        if (rowId < _paths.Length)
+            _paths[rowId] = default;
     }
 
-    private void EnsureCapacity(int entityId)
+    private void EnsureCapacity(int rowId)
     {
-        if (entityId >= _paths.Length)
-            Array.Resize(ref _paths, Math.Max(entityId + 1, _paths.Length * 2));
+        if (rowId >= _paths.Length)
+            Array.Resize(ref _paths, Math.Max(rowId + 1, _paths.Length * 2));
     }
 
     // ── Serialization ────────────────────────────────────────────────────────

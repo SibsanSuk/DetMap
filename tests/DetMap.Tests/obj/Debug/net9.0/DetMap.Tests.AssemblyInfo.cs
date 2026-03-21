@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DetMap.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f71290a5d8890d7a31efd9465cebd48a88fcf8cc")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e696a80460b945dc75564769eb414f928112ec59")]
 [assembly: System.Reflection.AssemblyProductAttribute("DetMap.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DetMap.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

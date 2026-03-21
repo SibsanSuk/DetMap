@@ -6,11 +6,11 @@ namespace DetMap.Tests.Building;
 
 public class BuildingPlacerTests
 {
-    private static (DetGrid grid, DetValueLayer<int> bldg, DetBitLayer walkable) MakeGrid(int w = 16, int h = 16)
+    private static (DetGrid grid, DetValueLayer<int> bldg, DetBooleanLayer walkable) MakeGrid(int w = 16, int h = 16)
     {
         var grid = new DetGrid(w, h);
         var bldg = grid.CreateValueLayer("building", DetType.Int);
-        var walkable = grid.CreateBitLayer("walkable");
+        var walkable = grid.CreateBooleanLayer("walkable");
         walkable.SetAll(true);
         return (grid, bldg, walkable);
     }

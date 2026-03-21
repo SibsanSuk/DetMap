@@ -50,7 +50,7 @@ public class DetPathStoreTests
     }
 
     [Fact]
-    public void Set_EntityIdBeyondCapacity_GrowsCorrectly()
+    public void Set_RowIdBeyondCapacity_GrowsCorrectly()
     {
         var store = new DetPathStore("paths", capacity: 4);
         store.Set(10, MakePath(3));
@@ -133,7 +133,7 @@ public class DetPathStoreTests
     [Fact]
     public void PathfinderResult_StoreAndAdvance_WorksCorrectly()
     {
-        var walkable = new DetBitLayer("walkable", 16, 16);
+        var walkable = new DetBooleanLayer("walkable", 16, 16);
         walkable.SetAll(true);
 
         var pf    = new DetPathfinder(16, 16);

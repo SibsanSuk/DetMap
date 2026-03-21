@@ -64,14 +64,14 @@ public class QueryEngineTests
     public void FloodFill_Blocked_StopsAtBoundary()
     {
         var grid = MakeGrid(5, 5);
-        var walkable = grid.CreateBitLayer("walkable");
+        var walkable = grid.CreateBooleanLayer("walkable");
         walkable.SetAll(true);
         // Block column x=2
         for (int y = 0; y < 5; y++) walkable.Set(2, y, false);
 
         var results = new CellHit[25];
         int count = QueryEngine.FloodFill(grid, 0, 2,
-            (g, x, y) => g.GetBitLayer("walkable").Get(x, y),
+            (g, x, y) => g.GetBooleanLayer("walkable").Get(x, y),
             results);
         Assert.Equal(10, count); // only left side: x=0,1 * y=0..4
     }

@@ -13,13 +13,13 @@ public class DetMapIntegrationTests
     [Fact]
     public void FullScenario_SpawnMovePathfind_Works()
     {
-        var map = new DetMap.Core.DetMap(64, 64);
+        var map = new DetSpatialDatabase(64, 64);
 
         var building = map.Grid.CreateValueLayer("building", DetType.Int);
-        var walkable = map.Grid.CreateBitLayer("walkable");
+        var walkable = map.Grid.CreateBooleanLayer("walkable");
         walkable.SetAll(true);
 
-        var units = map.Grid.CreateEntityLayer("units");
+        var units = map.Grid.CreateCellIndex("units");
         var chars = map.CreateTable("characters");
         var nameCol = chars.CreateStringColumn("name");
         var jobCol = chars.CreateColumn("job", DetType.Byte);
@@ -29,10 +29,10 @@ public class DetMapIntegrationTests
         Assert.Equal(Fix64.FromInt(1000), map.GetGlobal("treasury"));
 
         // Spawn
-        int somchai = chars.Insert();
+        int somchai = chars.CreateRow();
         nameCol.Set(somchai, "Somchai");
         jobCol.Set(somchai, 1);
-        units.Add(somchai, 10, 10);
+        units.Place(somchai, 10, 10);
         Assert.Equal(1, units.CountAt(10, 10));
 
         // Place temple
@@ -56,7 +56,7 @@ public class DetMapIntegrationTests
         Assert.False(p.IsComplete);
         p.Advance();
         var (nx, ny) = p.Current(64);
-        units.Move(somchai, nx, ny);
+        units.MoveTo(somchai, nx, ny);
         Assert.Equal(1, units.CountAt(nx, ny));
         Assert.Equal(0, units.CountAt(10, 10));
     }
@@ -64,7 +64,7 @@ public class DetMapIntegrationTests
     [Fact]
     public void Globals_SetGet_Deterministic()
     {
-        var map = new DetMap.Core.DetMap(16, 16);
+        var map = new DetSpatialDatabase(16, 16);
         map.SetGlobal("season", Fix64.FromInt(2));
         map.SetGlobal("population", Fix64.FromInt(500));
         Assert.Equal(Fix64.FromInt(2), map.GetGlobal("season"));
@@ -75,7 +75,7 @@ public class DetMapIntegrationTests
     [Fact]
     public void AdvanceTick_IncrementsTick()
     {
-        var map = new DetMap.Core.DetMap(16, 16);
+        var map = new DetSpatialDatabase(16, 16);
         Assert.Equal(0UL, map.Tick);
         map.AdvanceTick();
         map.AdvanceTick();

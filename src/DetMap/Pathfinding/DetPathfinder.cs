@@ -32,7 +32,7 @@ public sealed class DetPathfinder
     public DetPath FindPath(
         int startX, int startY,
         int goalX, int goalY,
-        DetBitLayer walkable,
+        DetBooleanLayer walkable,
         DetValueLayer<byte>? unitCount = null,
         int maxSearchNodes = 2048)
     {

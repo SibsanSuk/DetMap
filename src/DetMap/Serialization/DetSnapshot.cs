@@ -7,7 +7,7 @@ using DetMap.Tables;
 namespace DetMap.Serialization;
 
 /// <summary>
-/// Binary save/load for DetMap.
+/// Binary save/load for DetMap state.
 ///
 /// Format (version 2):
 ///   [4]  magic: 'D','M','A','P'
@@ -33,12 +33,12 @@ namespace DetMap.Serialization;
 ///   pathstore data × P: [4] slotCount
 ///     per slot: [4] length  if length>0: [4] currentStep  [length×4] steps
 /// </summary>
-public static class Snapshot
+public static class DetSnapshot
 {
     private static readonly byte[] Magic = { (byte)'D', (byte)'M', (byte)'A', (byte)'P' };
     private const ushort Version = 2;
 
-    public static byte[] Serialize(DetMap.Core.DetMap map)
+    public static byte[] Serialize(DetSpatialDatabase database)
     {
         using var ms = new MemoryStream();
         using var bw = new BinaryWriter(ms);
@@ -47,10 +47,12 @@ public static class Snapshot
         bw.Write(Version);
 
         // ── SCHEMA ──────────────────────────────────────────────────────────
-        bw.Write(map.Grid.Width);
-        bw.Write(map.Grid.Height);
+        bw.Write(database.Grid.Width);
+        bw.Write(database.Grid.Height);
 
-        var layers = new List<IDetLayer>(map.Grid.AllLayers.Values);
+        var layers = new List<IDetLayer>(database.Grid.LayerOrder.Count);
+        foreach (var name in database.Grid.LayerOrder)
+            layers.Add(database.Grid.AllLayers[name]);
         bw.Write(layers.Count);
         foreach (var layer in layers)
         {
@@ -58,7 +60,9 @@ public static class Snapshot
             bw.Write(layer.Name);
         }
 
-        var tables = new List<DetTable>(map.Tables.Values);
+        var tables = new List<DetTable>(database.TableOrder.Count);
+        foreach (var name in database.TableOrder)
+            tables.Add(database.Tables[name]);
         bw.Write(tables.Count);
         foreach (var table in tables)
         {
@@ -71,24 +75,26 @@ public static class Snapshot
             }
         }
 
-        var globalKeys = new List<string>(map.Globals.Keys);
+        var globalKeys = new List<string>(database.Globals.Keys);
         globalKeys.Sort(StringComparer.Ordinal);
         bw.Write(globalKeys.Count);
         foreach (var key in globalKeys) bw.Write(key);
 
-        var pathStores = new List<DetPathStore>(map.PathStores.Values);
+        var pathStores = new List<DetPathStore>(database.PathStoreOrder.Count);
+        foreach (var name in database.PathStoreOrder)
+            pathStores.Add(database.PathStores[name]);
         bw.Write(pathStores.Count);
         foreach (var store in pathStores) bw.Write(store.Name);
 
         // ── DATA ────────────────────────────────────────────────────────────
-        bw.Write(map.Tick);
+        bw.Write(database.Tick);
 
-        int cellCount = map.Grid.Width * map.Grid.Height;
+        int cellCount = database.Grid.Width * database.Grid.Height;
         foreach (var layer in layers)
             layer.WriteToStream(bw);
 
         foreach (var key in globalKeys)
-            bw.Write(map.Globals[key].RawValue);
+            bw.Write(database.Globals[key].RawValue);
 
         foreach (var table in tables)
             table.WriteDataToStream(bw);
@@ -99,7 +105,7 @@ public static class Snapshot
         return ms.ToArray();
     }
 
-    public static DetMap.Core.DetMap Deserialize(byte[] data)
+    public static DetSpatialDatabase Deserialize(byte[] data)
     {
         using var ms = new MemoryStream(data);
         using var br = new BinaryReader(ms);
@@ -143,22 +149,22 @@ public static class Snapshot
         // ── DATA ────────────────────────────────────────────────────────────
         ulong tick = br.ReadUInt64();
 
-        var map = new DetMap.Core.DetMap(width, height);
-        map.SetTick(tick);
+        var database = new DetSpatialDatabase(width, height);
+        database.SetTick(tick);
 
         int cellCount = width * height;
         foreach (var (kind, name) in layerSchema)
         {
-            IDetLayer layer = CreateLayerFromKind(map, kind, name);
+            IDetLayer layer = CreateLayerFromKind(database, kind, name);
             layer.ReadFromStream(br, cellCount);
         }
 
         for (int i = 0; i < globalCount; i++)
-            map.SetGlobal(globalKeys[i], Fix64.FromRaw(br.ReadInt64()));
+            database.SetGlobal(globalKeys[i], Fix64.FromRaw(br.ReadInt64()));
 
         foreach (var (tName, cols) in tableSchema)
         {
-            var table = map.CreateTable(tName);
+            var table = database.CreateTable(tName);
             foreach (var (kind, colName) in cols)
                 RegisterColumn(table, kind, colName);
             table.ReadDataFromStream(br);
@@ -166,23 +172,23 @@ public static class Snapshot
 
         foreach (var name in pathStoreNames)
         {
-            var store = map.CreatePathStore(name);
+            var store = database.CreatePathStore(name);
             store.ReadFromStream(br);
         }
 
-        return map;
+        return database;
     }
 
-    private static IDetLayer CreateLayerFromKind(DetMap.Core.DetMap map, DetLayerKind kind, string name)
+    private static IDetLayer CreateLayerFromKind(DetSpatialDatabase database, DetLayerKind kind, string name)
         => kind switch
         {
-            DetLayerKind.ValueByte  => map.Grid.CreateValueLayer(name, DetType.Byte),
-            DetLayerKind.ValueInt   => map.Grid.CreateValueLayer(name, DetType.Int),
-            DetLayerKind.ValueFix64 => map.Grid.CreateValueLayer(name, DetType.Fix64),
-            DetLayerKind.Bit => map.Grid.CreateBitLayer(name),
-            DetLayerKind.Entity => map.Grid.CreateEntityLayer(name),
-            DetLayerKind.Tag => map.Grid.CreateTagLayer(name),
-            DetLayerKind.Flow => map.Grid.CreateFlowLayer(name),
+            DetLayerKind.ValueByte  => database.Grid.CreateValueLayer(name, DetType.Byte),
+            DetLayerKind.ValueInt   => database.Grid.CreateValueLayer(name, DetType.Int),
+            DetLayerKind.ValueFix64 => database.Grid.CreateValueLayer(name, DetType.Fix64),
+            DetLayerKind.Boolean => database.Grid.CreateBooleanLayer(name),
+            DetLayerKind.CellIndex => database.Grid.CreateCellIndex(name),
+            DetLayerKind.Tag => database.Grid.CreateTagLayer(name),
+            DetLayerKind.Flow => database.Grid.CreateFlowLayer(name),
             _ => throw new InvalidDataException($"Unknown layer kind: {(byte)kind}"),
         };
 

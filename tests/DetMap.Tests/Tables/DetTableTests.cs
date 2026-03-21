@@ -1,4 +1,5 @@
 using DetMap.Core;
+using DetMap.Schema;
 using DetMap.Tables;
 
 namespace DetMap.Tests.Tables;
@@ -9,8 +10,8 @@ public class DetTableTests
     public void Spawn_ReturnsSequentialIds()
     {
         var table = new DetTable("chars");
-        int id0 = table.Insert();
-        int id1 = table.Insert();
+        int id0 = table.CreateRow();
+        int id1 = table.CreateRow();
         Assert.Equal(0, id0);
         Assert.Equal(1, id1);
     }
@@ -19,9 +20,9 @@ public class DetTableTests
     public void Despawn_RecyclesId()
     {
         var table = new DetTable("chars");
-        int id = table.Insert();
-        table.Delete(id);
-        int recycled = table.Insert();
+        int id = table.CreateRow();
+        table.DeleteRow(id);
+        int recycled = table.CreateRow();
         Assert.Equal(id, recycled);
     }
 
@@ -29,17 +30,17 @@ public class DetTableTests
     public void IsAlive_AfterSpawn_IsTrue()
     {
         var table = new DetTable("chars");
-        int id = table.Insert();
-        Assert.True(table.Exists(id));
+        int id = table.CreateRow();
+        Assert.True(table.RowExists(id));
     }
 
     [Fact]
     public void IsAlive_AfterDespawn_IsFalse()
     {
         var table = new DetTable("chars");
-        int id = table.Insert();
-        table.Delete(id);
-        Assert.False(table.Exists(id));
+        int id = table.CreateRow();
+        table.DeleteRow(id);
+        Assert.False(table.RowExists(id));
     }
 
     [Fact]
@@ -47,7 +48,7 @@ public class DetTableTests
     {
         var table = new DetTable("chars");
         var jobCol = table.CreateColumn("job", DetType.Byte);
-        int id = table.Insert();
+        int id = table.CreateRow();
         jobCol.Set(id, 3);
         Assert.Equal(3, jobCol.Get(id));
     }
@@ -57,21 +58,21 @@ public class DetTableTests
     {
         var table = new DetTable("chars");
         var nameCol = table.CreateStringColumn("name");
-        int id = table.Insert();
+        int id = table.CreateRow();
         nameCol.Set(id, "Somchai");
         Assert.Equal("Somchai", nameCol.Get(id));
     }
 
     [Fact]
-    public void GetAliveIds_IteratesInDeterministicOrder()
+    public void GetRowIds_IteratesInDeterministicOrder()
     {
         var table = new DetTable("chars");
-        int a = table.Insert();
-        int b = table.Insert();
-        int c = table.Insert();
-        table.Delete(b);
+        int a = table.CreateRow();
+        int b = table.CreateRow();
+        int c = table.CreateRow();
+        table.DeleteRow(b);
 
-        var alive = table.GetAliveIds().ToList();
+        var alive = table.GetRowIds().ToList();
         Assert.Equal(new[] { a, c }, alive);
     }
 
@@ -79,13 +80,13 @@ public class DetTableTests
     public void FreeList_LIFO_EnsuresDeterministicRecycle()
     {
         var table = new DetTable("chars");
-        int a = table.Insert();
-        int b = table.Insert();
-        table.Delete(a);
-        table.Delete(b);
+        int a = table.CreateRow();
+        int b = table.CreateRow();
+        table.DeleteRow(a);
+        table.DeleteRow(b);
         // LIFO: b despawned last → b recycled first
-        Assert.Equal(b, table.Insert());
-        Assert.Equal(a, table.Insert());
+        Assert.Equal(b, table.CreateRow());
+        Assert.Equal(a, table.CreateRow());
     }
 
     [Fact]
@@ -94,7 +95,7 @@ public class DetTableTests
         var table = new DetTable("chars");
         var added = table.CreateColumn("job", DetType.Byte);
         var retrieved = table.GetColumn<byte>("job");
-        int id = table.Insert();
+        int id = table.CreateRow();
         retrieved.Set(id, 7);
         Assert.Equal(7, added.Get(id));
     }
@@ -105,7 +106,7 @@ public class DetTableTests
         var table = new DetTable("chars");
         var added = table.CreateStringColumn("name");
         var retrieved = table.GetStringColumn("name");
-        int id = table.Insert();
+        int id = table.CreateRow();
         retrieved.Set(id, "Test");
         Assert.Equal("Test", added.Get(id));
     }
@@ -114,9 +115,9 @@ public class DetTableTests
     public void HighWater_TracksMaxIdAllocated()
     {
         var table = new DetTable("chars");
-        table.Insert();
-        table.Insert();
-        table.Insert();
+        table.CreateRow();
+        table.CreateRow();
+        table.CreateRow();
         Assert.Equal(3, table.HighWater);
     }
 
@@ -124,9 +125,23 @@ public class DetTableTests
     public void HighWater_DoesNotDecreaseOnDespawn()
     {
         var table = new DetTable("chars");
-        int id = table.Insert();
-        table.Delete(id);
+        int id = table.CreateRow();
+        table.DeleteRow(id);
         Assert.Equal(1, table.HighWater);
+    }
+
+    [Fact]
+    public void PeekNextRowId_MatchesNextCreateRow()
+    {
+        var table = new DetTable("chars");
+        Assert.Equal(0, table.PeekNextRowId());
+
+        int first = table.CreateRow();
+        Assert.Equal(first + 1, table.PeekNextRowId());
+
+        table.DeleteRow(first);
+        Assert.Equal(first, table.PeekNextRowId());
+        Assert.Equal(first, table.CreateRow());
     }
 
     [Fact]
@@ -134,5 +149,25 @@ public class DetTableTests
     {
         var table = new DetTable("characters");
         Assert.Equal("characters", table.Name);
+    }
+
+    [Fact]
+    public void GetSchema_PreservesColumnOrderAndKinds()
+    {
+        var table = new DetTable("workers");
+        table.CreateStringColumn("name");
+        table.CreateColumn("job", DetType.Byte);
+        table.CreateColumn("hp", DetType.Int);
+
+        DetTableSchema schema = table.GetSchema();
+
+        Assert.Equal("workers", schema.Name);
+        Assert.Equal(3, schema.Columns.Count);
+        Assert.Equal("name", schema.Columns[0].Name);
+        Assert.Equal(DetColumnKind.String, schema.Columns[0].Kind);
+        Assert.Equal("job", schema.Columns[1].Name);
+        Assert.Equal(DetColumnKind.Byte, schema.Columns[1].Kind);
+        Assert.Equal("hp", schema.Columns[2].Name);
+        Assert.Equal(DetColumnKind.Int, schema.Columns[2].Kind);
     }
 }
