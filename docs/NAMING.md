@@ -73,7 +73,7 @@ Canonical type:
 Canonical types:
 
 - `DetValueLayer<T>`
-- `DetBooleanLayer`
+- `DetBitLayer`
 - `DetTagLayer`
 - `DetFlowLayer`
 
@@ -115,10 +115,19 @@ Canonical types:
 
 Public methods:
 
+- `CreateByteColumn`
+- `CreateIntColumn`
+- `CreateFix64Column`
+- `CreateStringColumn`
+- `GetByteColumn`
+- `GetIntColumn`
+- `GetFix64Column`
+- `GetStringColumn`
+
+Low-level generic API:
+
 - `CreateColumn`
 - `GetColumn`
-- `CreateStringColumn`
-- `GetStringColumn`
 
 Do not use `Col` in public API.
 
@@ -201,20 +210,26 @@ Avoid:
 
 Good:
 
+- `CreateByteLayer`
+- `CreateIntLayer`
+- `CreateFix64Layer`
+- `CreateBitLayer`
 - `CreateValueLayer`
-- `CreateBooleanLayer`
 - `CreateCellIndex`
 - `CreateTagLayer`
 - `CreateFlowLayer`
+- `GetByteLayer`
+- `GetIntLayer`
+- `GetFix64Layer`
 - `GetValueLayer`
-- `GetBooleanLayer`
+- `GetBitLayer`
 - `GetCellIndex`
 - `GetTagLayer`
 - `GetFlowLayer`
 
 Avoid:
 
-- `CreateBitLayer`
+- `CreateBooleanLayer`
 - `CreateEntityLayer`
 - noun-only getters
 
@@ -307,7 +322,7 @@ DetMap public naming should read like a spatial database:
 - `DetTable`
 - `DetColumn<T>`
 - `DetValueLayer<T>`
-- `DetBooleanLayer`
+- `DetBitLayer`
 - `DetCellIndex`
 - `DetPathStore`
 - `DetSnapshot`

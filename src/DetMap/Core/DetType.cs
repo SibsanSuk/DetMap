@@ -13,7 +13,7 @@ public sealed class DetType<T> where T : unmanaged
 }
 
 /// <summary>
-/// Allowed deterministic types for <see cref="DetGrid.CreateLayer{T}"/> and <see cref="DetTable.CreateCol{T}"/>.
+/// Allowed deterministic types for <see cref="DetGrid.CreateValueLayer{T}"/> and <see cref="DetTable.CreateColumn{T}"/>.
 /// </summary>
 public static class DetType
 {

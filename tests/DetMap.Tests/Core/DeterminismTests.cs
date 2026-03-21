@@ -18,9 +18,9 @@ public class DeterminismTests
     {
         var map = new DetSpatialDatabase(32, 32);
 
-        var building = map.Grid.CreateValueLayer("building", DetType.Int);
-        var height   = map.Grid.CreateValueLayer("height",   DetType.Fix64);
-        var walkable = map.Grid.CreateBooleanLayer("walkable");
+        var building = map.Grid.CreateIntLayer("building");
+        var height   = map.Grid.CreateFix64Layer("height");
+        var walkable = map.Grid.CreateBitLayer("walkable");
         var units    = map.Grid.CreateCellIndex("units");
         var services = map.Grid.CreateTagLayer("services");
 
@@ -31,7 +31,7 @@ public class DeterminismTests
 
         var chars   = map.CreateTable("characters");
         var nameCol = chars.CreateStringColumn("name");
-        var jobCol  = chars.CreateColumn("job", DetType.Byte);
+        var jobCol  = chars.CreateByteColumn("job");
         var pathStore = map.CreatePathStore("unitPaths");
 
         // Place buildings
@@ -109,8 +109,8 @@ public class DeterminismTests
     {
         var map1 = BuildAndSimulate();
         var map2 = BuildAndSimulate();
-        var b1 = map1.Grid.GetValueLayer<int>("building");
-        var b2 = map2.Grid.GetValueLayer<int>("building");
+        var b1 = map1.Grid.GetIntLayer("building");
+        var b2 = map2.Grid.GetIntLayer("building");
         for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++)
             Assert.Equal(b1.Get(x, y), b2.Get(x, y));
@@ -121,8 +121,8 @@ public class DeterminismTests
     {
         var map1 = BuildAndSimulate();
         var map2 = BuildAndSimulate();
-        var h1 = map1.Grid.GetValueLayer<Fix64>("height");
-        var h2 = map2.Grid.GetValueLayer<Fix64>("height");
+        var h1 = map1.Grid.GetFix64Layer("height");
+        var h2 = map2.Grid.GetFix64Layer("height");
         for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++)
             Assert.Equal(h1.Get(x, y).RawValue, h2.Get(x, y).RawValue);
@@ -133,8 +133,8 @@ public class DeterminismTests
     {
         var map1 = BuildAndSimulate();
         var map2 = BuildAndSimulate();
-        var w1 = map1.Grid.GetBooleanLayer("walkable");
-        var w2 = map2.Grid.GetBooleanLayer("walkable");
+        var w1 = map1.Grid.GetBitLayer("walkable");
+        var w2 = map2.Grid.GetBitLayer("walkable");
         for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++)
             Assert.Equal(w1.Get(x, y), w2.Get(x, y));
@@ -155,7 +155,7 @@ public class DeterminismTests
     [Fact]
     public void SimulationPath_SameInputTwice_IdenticalRoute()
     {
-        var walkable = new DetBooleanLayer("walkable", 32, 32);
+        var walkable = new DetBitLayer("walkable", 32, 32);
         walkable.SetAll(true);
         // Wall at y=10, x=5..20
         for (int x = 5; x <= 20; x++) walkable.Set(x, 10, false);

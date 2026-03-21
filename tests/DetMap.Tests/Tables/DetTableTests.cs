@@ -47,7 +47,7 @@ public class DetTableTests
     public void Column_SetGet_RoundTrips()
     {
         var table = new DetTable("chars");
-        var jobCol = table.CreateColumn("job", DetType.Byte);
+        var jobCol = table.CreateByteColumn("job");
         int id = table.CreateRow();
         jobCol.Set(id, 3);
         Assert.Equal(3, jobCol.Get(id));
@@ -112,6 +112,20 @@ public class DetTableTests
     }
 
     [Fact]
+    public void TypedColumnFactories_RetrieveTypedColumnsByName()
+    {
+        var table = new DetTable("chars");
+
+        var byteColumn = table.CreateByteColumn("job");
+        var intColumn = table.CreateIntColumn("hp");
+        var fix64Column = table.CreateFix64Column("xp");
+
+        Assert.Same(byteColumn, table.GetByteColumn("job"));
+        Assert.Same(intColumn, table.GetIntColumn("hp"));
+        Assert.Same(fix64Column, table.GetFix64Column("xp"));
+    }
+
+    [Fact]
     public void HighWater_TracksMaxIdAllocated()
     {
         var table = new DetTable("chars");
@@ -156,8 +170,8 @@ public class DetTableTests
     {
         var table = new DetTable("workers");
         table.CreateStringColumn("name");
-        table.CreateColumn("job", DetType.Byte);
-        table.CreateColumn("hp", DetType.Int);
+        table.CreateByteColumn("job");
+        table.CreateIntColumn("hp");
 
         DetTableSchema schema = table.GetSchema();
 

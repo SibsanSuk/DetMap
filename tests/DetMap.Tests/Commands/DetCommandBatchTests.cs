@@ -10,13 +10,13 @@ public class DetCommandBatchTests
     public void ApplyTo_WritesGlobalsRowsColumnsLayersAndIndexes()
     {
         var database = new DetSpatialDatabase(16, 16);
-        database.Grid.CreateValueLayer("height", DetType.Fix64);
-        database.Grid.CreateBooleanLayer("walkable");
+        database.Grid.CreateFix64Layer("height");
+        database.Grid.CreateBitLayer("walkable");
         database.Grid.CreateCellIndex("units");
 
         var workers = database.CreateTable("workers");
         workers.CreateStringColumn("name");
-        workers.CreateColumn("hp", DetType.Int);
+        workers.CreateIntColumn("hp");
 
         var batch = new DetCommandBatch();
         int rowId = workers.PeekNextRowId();
@@ -25,7 +25,7 @@ public class DetCommandBatchTests
         batch.CreateRow("workers", rowId);
         batch.SetString("workers", "name", rowId, "Somchai");
         batch.SetInt("workers", "hp", rowId, 100);
-        batch.SetBooleanCell("walkable", 3, 4, true);
+        batch.SetBitCell("walkable", 3, 4, true);
         batch.SetFix64Cell("height", 3, 4, Fix64.FromInt(7));
         batch.PlaceRow("units", rowId, 3, 4);
 
@@ -34,9 +34,9 @@ public class DetCommandBatchTests
         Assert.Equal(Fix64.FromInt(1), database.GetGlobal("population"));
         Assert.True(workers.RowExists(rowId));
         Assert.Equal("Somchai", workers.GetStringColumn("name").Get(rowId));
-        Assert.Equal(100, workers.GetColumn<int>("hp").Get(rowId));
-        Assert.True(database.Grid.GetBooleanLayer("walkable").Get(3, 4));
-        Assert.Equal(Fix64.FromInt(7), database.Grid.GetValueLayer<Fix64>("height").Get(3, 4));
+        Assert.Equal(100, workers.GetIntColumn("hp").Get(rowId));
+        Assert.True(database.Grid.GetBitLayer("walkable").Get(3, 4));
+        Assert.Equal(Fix64.FromInt(7), database.Grid.GetFix64Layer("height").Get(3, 4));
         Assert.Equal(1, database.Grid.GetCellIndex("units").CountAt(3, 4));
     }
 
@@ -58,7 +58,7 @@ public class DetCommandBatchTests
         var database = new DetSpatialDatabase(8, 8);
         database.Grid.CreateCellIndex("units");
         var workers = database.CreateTable("workers");
-        workers.CreateColumn("hp", DetType.Int);
+        workers.CreateIntColumn("hp");
 
         int rowId = workers.PeekNextRowId();
         var batch = new DetCommandBatch();
@@ -71,7 +71,7 @@ public class DetCommandBatchTests
         database.Apply(batch);
 
         Assert.True(workers.RowExists(rowId));
-        Assert.Equal(10, workers.GetColumn<int>("hp").Get(rowId));
+        Assert.Equal(10, workers.GetIntColumn("hp").Get(rowId));
         Assert.Equal(0, database.Grid.GetCellIndex("units").CountAt(1, 1));
         Assert.Equal(0, database.Grid.GetCellIndex("units").CountAt(2, 1));
     }

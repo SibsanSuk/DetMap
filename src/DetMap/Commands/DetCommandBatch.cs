@@ -14,7 +14,7 @@ public enum DetCommandKind : byte
     SetIntColumn = 4,
     SetFix64Column = 5,
     SetStringColumn = 6,
-    SetBooleanCell = 7,
+    SetBitCell = 7,
     SetByteCell = 8,
     SetIntCell = 9,
     SetFix64Cell = 10,
@@ -57,8 +57,8 @@ public sealed class DetCommandBatch
     public void SetString(string tableName, string columnName, int rowId, string? value)
         => _commands.Add(new SetStringColumnCommand(tableName, columnName, rowId, value));
 
-    public void SetBooleanCell(string layerName, int x, int y, bool value)
-        => _commands.Add(new SetBooleanCellCommand(layerName, x, y, value));
+    public void SetBitCell(string layerName, int x, int y, bool value)
+        => _commands.Add(new SetBitCellCommand(layerName, x, y, value));
 
     public void SetByteCell(string layerName, int x, int y, byte value)
         => _commands.Add(new SetByteCellCommand(layerName, x, y, value));
@@ -156,7 +156,7 @@ public sealed class SetByteColumnCommand : IDetCommand
     }
 
     public void ApplyTo(DetSpatialDatabase database)
-        => database.GetTable(_tableName).GetColumn<byte>(_columnName).Set(_rowId, _value);
+        => database.GetTable(_tableName).GetByteColumn(_columnName).Set(_rowId, _value);
 }
 
 public sealed class SetIntColumnCommand : IDetCommand
@@ -176,7 +176,7 @@ public sealed class SetIntColumnCommand : IDetCommand
     }
 
     public void ApplyTo(DetSpatialDatabase database)
-        => database.GetTable(_tableName).GetColumn<int>(_columnName).Set(_rowId, _value);
+        => database.GetTable(_tableName).GetIntColumn(_columnName).Set(_rowId, _value);
 }
 
 public sealed class SetFix64ColumnCommand : IDetCommand
@@ -196,7 +196,7 @@ public sealed class SetFix64ColumnCommand : IDetCommand
     }
 
     public void ApplyTo(DetSpatialDatabase database)
-        => database.GetTable(_tableName).GetColumn<Fix64>(_columnName).Set(_rowId, _value);
+        => database.GetTable(_tableName).GetFix64Column(_columnName).Set(_rowId, _value);
 }
 
 public sealed class SetStringColumnCommand : IDetCommand
@@ -219,15 +219,15 @@ public sealed class SetStringColumnCommand : IDetCommand
         => database.GetTable(_tableName).GetStringColumn(_columnName).Set(_rowId, _value);
 }
 
-public sealed class SetBooleanCellCommand : IDetCommand
+public sealed class SetBitCellCommand : IDetCommand
 {
-    public DetCommandKind Kind => DetCommandKind.SetBooleanCell;
+    public DetCommandKind Kind => DetCommandKind.SetBitCell;
     private readonly string _layerName;
     private readonly int _x;
     private readonly int _y;
     private readonly bool _value;
 
-    public SetBooleanCellCommand(string layerName, int x, int y, bool value)
+    public SetBitCellCommand(string layerName, int x, int y, bool value)
     {
         _layerName = layerName;
         _x = x;
@@ -236,7 +236,7 @@ public sealed class SetBooleanCellCommand : IDetCommand
     }
 
     public void ApplyTo(DetSpatialDatabase database)
-        => database.Grid.GetBooleanLayer(_layerName).Set(_x, _y, _value);
+        => database.Grid.GetBitLayer(_layerName).Set(_x, _y, _value);
 }
 
 public sealed class SetByteCellCommand : IDetCommand
@@ -256,7 +256,7 @@ public sealed class SetByteCellCommand : IDetCommand
     }
 
     public void ApplyTo(DetSpatialDatabase database)
-        => database.Grid.GetValueLayer<byte>(_layerName).Set(_x, _y, _value);
+        => database.Grid.GetByteLayer(_layerName).Set(_x, _y, _value);
 }
 
 public sealed class SetIntCellCommand : IDetCommand
@@ -276,7 +276,7 @@ public sealed class SetIntCellCommand : IDetCommand
     }
 
     public void ApplyTo(DetSpatialDatabase database)
-        => database.Grid.GetValueLayer<int>(_layerName).Set(_x, _y, _value);
+        => database.Grid.GetIntLayer(_layerName).Set(_x, _y, _value);
 }
 
 public sealed class SetFix64CellCommand : IDetCommand
@@ -296,7 +296,7 @@ public sealed class SetFix64CellCommand : IDetCommand
     }
 
     public void ApplyTo(DetSpatialDatabase database)
-        => database.Grid.GetValueLayer<Fix64>(_layerName).Set(_x, _y, _value);
+        => database.Grid.GetFix64Layer(_layerName).Set(_x, _y, _value);
 }
 
 public sealed class PlaceRowCommand : IDetCommand

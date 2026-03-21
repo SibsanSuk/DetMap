@@ -42,11 +42,25 @@ public class DetGridTests
     }
 
     [Fact]
-    public void CreateBooleanLayer_RetrievedByName()
+    public void TypedLayerFactories_RetrieveTypedLayersByName()
     {
         var grid = new DetGrid(8, 8);
-        var layer = grid.CreateBooleanLayer("walkable");
-        var retrieved = grid.GetBooleanLayer("walkable");
+
+        var byteLayer = grid.CreateByteLayer("flags");
+        var intLayer = grid.CreateIntLayer("building");
+        var fix64Layer = grid.CreateFix64Layer("height");
+
+        Assert.Same(byteLayer, grid.GetByteLayer("flags"));
+        Assert.Same(intLayer, grid.GetIntLayer("building"));
+        Assert.Same(fix64Layer, grid.GetFix64Layer("height"));
+    }
+
+    [Fact]
+    public void CreateBitLayer_RetrievedByName()
+    {
+        var grid = new DetGrid(8, 8);
+        var layer = grid.CreateBitLayer("walkable");
+        var retrieved = grid.GetBitLayer("walkable");
         Assert.Same(layer, retrieved);
     }
 
@@ -82,7 +96,7 @@ public class DetGridTests
     {
         var grid = new DetGrid(8, 8);
         grid.CreateValueLayer("building", DetType.Int);
-        grid.CreateBooleanLayer("walkable");
+        grid.CreateBitLayer("walkable");
         grid.CreateCellIndex("units");
         Assert.Equal(3, grid.AllLayers.Count);
     }
@@ -100,7 +114,7 @@ public class DetGridTests
     {
         var grid = new DetGrid(8, 8);
         grid.CreateValueLayer("height", DetType.Fix64);
-        grid.CreateBooleanLayer("walkable");
+        grid.CreateBitLayer("walkable");
         grid.CreateCellIndex("units");
 
         IReadOnlyList<DetLayerSchema> schemas = grid.GetLayerSchemas();
@@ -109,7 +123,7 @@ public class DetGridTests
         Assert.Equal("height", schemas[0].Name);
         Assert.Equal(DetLayerKind.ValueFix64, schemas[0].Kind);
         Assert.Equal("walkable", schemas[1].Name);
-        Assert.Equal(DetLayerKind.Boolean, schemas[1].Kind);
+        Assert.Equal(DetLayerKind.Bit, schemas[1].Kind);
         Assert.Equal("units", schemas[2].Name);
         Assert.Equal(DetLayerKind.CellIndex, schemas[2].Kind);
     }

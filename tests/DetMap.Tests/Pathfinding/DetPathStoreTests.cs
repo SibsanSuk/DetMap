@@ -133,7 +133,7 @@ public class DetPathStoreTests
     [Fact]
     public void PathfinderResult_StoreAndAdvance_WorksCorrectly()
     {
-        var walkable = new DetBooleanLayer("walkable", 16, 16);
+        var walkable = new DetBitLayer("walkable", 16, 16);
         walkable.SetAll(true);
 
         var pf    = new DetPathfinder(16, 16);

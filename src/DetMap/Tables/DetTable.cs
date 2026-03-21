@@ -1,3 +1,4 @@
+using DetMath;
 using DetMap.Core;
 using DetMap.Schema;
 
@@ -37,6 +38,9 @@ public sealed class DetTable
 
     public bool RowExists(int id) => _alive.Get(id) == 1;
 
+    /// <summary>
+    /// Low-level generic column factory. Prefer the typed helpers when the column kind is known.
+    /// </summary>
     /// <param name="type">Use <see cref="DetType.Byte"/>, <see cref="DetType.Int"/>, or <see cref="DetType.Fix64"/>.</param>
     public DetColumn<T> CreateColumn<T>(string name, DetType<T> type) where T : unmanaged
     {
@@ -45,6 +49,15 @@ public sealed class DetTable
         _columnOrder.Add(name);
         return column;
     }
+
+    public DetColumn<byte> CreateByteColumn(string name)
+        => CreateColumn(name, DetType.Byte);
+
+    public DetColumn<int> CreateIntColumn(string name)
+        => CreateColumn(name, DetType.Int);
+
+    public DetColumn<Fix64> CreateFix64Column(string name)
+        => CreateColumn(name, DetType.Fix64);
 
     public DetStringColumn CreateStringColumn(string name)
     {
@@ -55,6 +68,9 @@ public sealed class DetTable
     }
 
     public DetColumn<T> GetColumn<T>(string name) where T : unmanaged => (DetColumn<T>)_columns[name];
+    public DetColumn<byte> GetByteColumn(string name) => (DetColumn<byte>)_columns[name];
+    public DetColumn<int> GetIntColumn(string name) => (DetColumn<int>)_columns[name];
+    public DetColumn<Fix64> GetFix64Column(string name) => (DetColumn<Fix64>)_columns[name];
     public DetStringColumn GetStringColumn(string name) => (DetStringColumn)_columns[name];
 
     /// <summary>Iterate existing rows in deterministic order (0..highWater).</summary>

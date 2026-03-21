@@ -13,7 +13,7 @@ Every read and write goes through **Fix64** fixed-point arithmetic (no `float`, 
 - [Quick Start](#quick-start)
 - [Layers](#layers)
   - [DetValueLayer\<T\> — dense value grid](#detvaluelayert--dense-value-grid)
-  - [DetBooleanLayer — packed booleans](#detbooleanlayer--packed-booleans)
+  - [DetBitLayer — packed booleans](#detbooleanlayer--packed-booleans)
   - [DetCellIndex — spatial row index](#detcellindex--spatial-row-index)
   - [DetTagLayer — multi-tag per cell](#dettaglayer--multi-tag-per-cell)
   - [DetFlowLayer — direction + cost grid](#detflowlayer--direction--cost-grid)
@@ -37,7 +37,7 @@ Every read and write goes through **Fix64** fixed-point arithmetic (no `float`, 
 DetSpatialDatabase           ← top-level state database (tick, globals, tables)
   └── DetGrid                ← holds all layers, exposes InBounds
         ├── DetValueLayer<T>    ← dense value grid  (byte / int / Fix64)
-        ├── DetBooleanLayer      ← bit-packed boolean grid
+        ├── DetBitLayer      ← bit-packed boolean grid
         ├── DetCellIndex   ← flat-array linked-list spatial row index
         ├── DetTagLayer      ← sparse multi-tag per cell
         └── DetFlowLayer     ← direction (byte) + cost (Fix64) per cell
@@ -55,6 +55,7 @@ DetSnapshot                  ← binary save/load with embedded schema
 ```
 
 Architecture note: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+Snapshot viewer note: [docs/SNAPSHOT_VIEWER.md](docs/SNAPSHOT_VIEWER.md)
 
 **Dependency**: [DetMath](DetMath/DetMathREADME.md) — Q2.2 fixed-point library compiled as `DetMath.dll` (`netstandard2.0`).
 
@@ -98,9 +99,9 @@ using DetMap.Tables;
 var map = new DetSpatialDatabase(64, 64);
 
 // 2. Create layers
-var building  = map.Grid.CreateValueLayer("building",  DetType.Int);
-var height    = map.Grid.CreateValueLayer("height",    DetType.Fix64);
-var walkable  = map.Grid.CreateBooleanLayer("walkable");
+var building  = map.Grid.CreateIntLayer("building");
+var height    = map.Grid.CreateFix64Layer("height");
+var walkable  = map.Grid.CreateBitLayer("walkable");
 var units     = map.Grid.CreateCellIndex("units");
 var services  = map.Grid.CreateTagLayer("services");
 
@@ -113,8 +114,8 @@ map.SetGlobal("population", Fix64.FromInt(0));
 // 4. Create a table
 var chars   = map.CreateTable("characters");
 var nameCol = chars.CreateStringColumn("name");
-var jobCol  = chars.CreateColumn("job", DetType.Byte);
-var hpCol   = chars.CreateColumn("hp", DetType.Int);
+var jobCol  = chars.CreateByteColumn("job");
+var hpCol   = chars.CreateIntColumn("hp");
 
 // 5. Place a building
 var houseDef = new BuildingDefinition("house", 2, 2, 1);
@@ -156,10 +157,10 @@ All layers are registered by name on the grid. Each has a `DirtyRect` that track
 Backed by a flat array `T[width * height]`. Supported element types: `byte`, `int`, `Fix64`.
 
 ```csharp
-// Creation — DetType token enforces compile-time determinism
-DetValueLayer<byte>  flags  = map.Grid.CreateValueLayer("flags",  DetType.Byte);
-DetValueLayer<int>   ids    = map.Grid.CreateValueLayer("ids",    DetType.Int);
-DetValueLayer<Fix64> height = map.Grid.CreateValueLayer("height", DetType.Fix64);
+// Preferred typed factories
+DetValueLayer<byte>  flags  = map.Grid.CreateByteLayer("flags");
+DetValueLayer<int>   ids    = map.Grid.CreateIntLayer("ids");
+DetValueLayer<Fix64> height = map.Grid.CreateFix64Layer("height");
 
 // Read / Write
 flags.Set(3, 4, 42);
@@ -179,7 +180,10 @@ flags.ClearDirty();
 Span<Fix64> raw = height.AsSpan();
 
 // Retrieve from grid by name
-DetValueLayer<int> ids2 = map.Grid.GetValueLayer<int>("ids");
+DetValueLayer<int> ids2 = map.Grid.GetIntLayer("ids");
+
+// Low-level generic API is still available when a DetType token is useful
+DetValueLayer<int> building2 = map.Grid.CreateValueLayer("building", DetType.Int);
 ```
 
 **Allowed types only.** Trying to pass a custom type that is not `byte`, `int`, or `Fix64` will fail to compile because `DetType<T>` has an `internal` constructor:
@@ -191,12 +195,12 @@ map.Grid.CreateValueLayer("speed", new DetType<float>());
 
 ---
 
-### DetBooleanLayer — packed booleans
+### DetBitLayer — packed booleans
 
 Stores one bit per cell using `ulong[]` words. 64× more memory-efficient than `DetValueLayer<byte>` for boolean data.
 
 ```csharp
-DetBooleanLayer walkable = map.Grid.CreateBooleanLayer("walkable");
+DetBitLayer walkable = map.Grid.CreateBitLayer("walkable");
 
 walkable.SetAll(true);
 walkable.Set(5, 5, false);        // mark cell as blocked
@@ -204,13 +208,13 @@ walkable.Set(5, 5, false);        // mark cell as blocked
 bool canWalk = walkable.Get(3, 3); // true
 
 // Bulk logical operations (writes into a pre-allocated result layer)
-var result = map.Grid.CreateBooleanLayer("temp");
-DetBooleanLayer.And(walkable, anotherLayer, result);
-DetBooleanLayer.Or (walkable, anotherLayer, result);
-DetBooleanLayer.Xor(walkable, anotherLayer, result);
+var result = map.Grid.CreateBitLayer("temp");
+DetBitLayer.And(walkable, anotherLayer, result);
+DetBitLayer.Or (walkable, anotherLayer, result);
+DetBitLayer.Xor(walkable, anotherLayer, result);
 
 // Retrieve by name
-DetBooleanLayer w = map.Grid.GetBooleanLayer("walkable");
+DetBitLayer w = map.Grid.GetBitLayer("walkable");
 ```
 
 ---
@@ -299,9 +303,9 @@ DetTable chars = map.CreateTable("characters");
 
 // Add columns before creating rows
 DetStringColumn nameCol = chars.CreateStringColumn("name");
-DetColumn<byte> jobCol  = chars.CreateColumn("job", DetType.Byte);
-DetColumn<int>  hpCol   = chars.CreateColumn("hp", DetType.Int);
-DetColumn<Fix64> xpCol  = chars.CreateColumn("xp", DetType.Fix64);
+DetColumn<byte>  jobCol = chars.CreateByteColumn("job");
+DetColumn<int>   hpCol  = chars.CreateIntColumn("hp");
+DetColumn<Fix64> xpCol  = chars.CreateFix64Column("xp");
 
 // Create row — returns next available ID (recycles deleted IDs, LIFO)
 int id = chars.CreateRow();             // 0
@@ -333,7 +337,7 @@ foreach (int i in chars.GetRowIds())
 DetTable t = map.GetTable("characters");
 
 // Retrieve column from table
-DetColumn<int>  hp2   = t.GetColumn<int>("hp");
+DetColumn<int>  hp2   = t.GetIntColumn("hp");
 DetStringColumn name2 = t.GetStringColumn("name");
 ```
 
@@ -465,7 +469,7 @@ if (path.IsValid)
 }
 
 // With unit density avoidance (units counted as extra cost)
-DetValueLayer<byte> unitCount = map.Grid.GetValueLayer<byte>("unit_count"); // optional
+DetValueLayer<byte> unitCount = map.Grid.GetByteLayer("unit_count"); // optional
 DetPath path2 = pf.FindPath(2, 5, 30, 30, walkable, unitCount, maxSearchNodes: 4096);
 
 // Default maxSearchNodes = 2048. Returns default(DetPath) if goal unreachable.
@@ -489,8 +493,8 @@ var market = new BuildingDefinition("market", w: 3, h: 2, buildingTypeId: 2);
 var lDef = new BuildingDefinition("Ltower", 4, 4, 3,
     mask: BuildingDefinition.CreateLShapeMask(4, 4));
 
-DetValueLayer<int> buildingLayer = map.Grid.GetValueLayer<int>("building");
-DetBooleanLayer   walkable      = map.Grid.GetBooleanLayer("walkable");
+DetValueLayer<int> buildingLayer = map.Grid.GetIntLayer("building");
+DetBitLayer        walkable      = map.Grid.GetBitLayer("walkable");
 
 // Check placement validity before placing
 bool ok = BuildingPlacer.CanPlace(map.Grid, ox: 10, oy: 5, house, buildingLayer, walkable);
@@ -503,7 +507,7 @@ if (ok)
 BuildingPlacer.Remove(map.Grid, 10, 5, house, buildingLayer, walkable);
 
 // CanPlace with extra condition (e.g. must be on flat terrain)
-DetValueLayer<Fix64> height = map.Grid.GetValueLayer<Fix64>("height");
+DetValueLayer<Fix64> height = map.Grid.GetFix64Layer("height");
 bool canBuild = BuildingPlacer.CanPlace(map.Grid, 10, 5, house, buildingLayer, walkable,
     extraCheck: (grid, x, y) => height.Get(x, y).RawValue == 0);
 ```
@@ -537,14 +541,14 @@ for (int i = 0; i < n; i++)
 int m = QueryEngine.RadiusQuery(
     map.Grid,
     cx: 10, cy: 10, radius: 5,
-    predicate: (grid, x, y) => grid.GetBooleanLayer("walkable").Get(x, y),
+    predicate: (grid, x, y) => grid.GetBitLayer("walkable").Get(x, y),
     resultBuffer: buffer);
 
 // Flood fill — spread from start while predicate is true (4-directional)
 int k = QueryEngine.FloodFill(
     map.Grid,
     startX: 3, startY: 3,
-    canSpread: (grid, x, y) => grid.GetBooleanLayer("walkable").Get(x, y),
+    canSpread: (grid, x, y) => grid.GetBitLayer("walkable").Get(x, y),
     resultBuffer: buffer);
 ```
 
@@ -573,16 +577,16 @@ DetSpatialDatabase restored = DetSnapshot.Deserialize(bytes);
 ulong tick = loaded.Tick;
 Fix64 gold = loaded.GetGlobal("treasury");
 
-DetValueLayer<int>    ids  = loaded.Grid.GetValueLayer<int>("building");
-DetBooleanLayer      walk = loaded.Grid.GetBooleanLayer("walkable");
-DetCellIndex     u    = loaded.Grid.GetCellIndex("units");
+DetValueLayer<int> ids  = loaded.Grid.GetIntLayer("building");
+DetBitLayer        walk = loaded.Grid.GetBitLayer("walkable");
+DetCellIndex       u    = loaded.Grid.GetCellIndex("units");
 DetTagLayer        svc  = loaded.Grid.GetTagLayer("services");
-DetFlowLayer     ff   = loaded.Grid.GetFlowLayer("group_flow");
+DetFlowLayer       ff   = loaded.Grid.GetFlowLayer("group_flow");
 
 DetTable  chars = loaded.GetTable("characters");
 string?   name  = chars.GetStringColumn("name").Get(0);
-int       hp    = chars.GetColumn<int>("hp").Get(0);
-Fix64     xp    = chars.GetColumn<Fix64>("xp").Get(0);
+int       hp    = chars.GetIntColumn("hp").Get(0);
+Fix64     xp    = chars.GetFix64Column("xp").Get(0);
 ```
 
 ### Binary Format
@@ -659,15 +663,15 @@ void Awake()
 {
     _map = new DetSpatialDatabase(64, 64);
 
-    _buildingLayer = _map.Grid.CreateValueLayer("building", DetType.Int);
-    _walkable      = _map.Grid.CreateBooleanLayer("walkable");
+    _buildingLayer = _map.Grid.CreateIntLayer("building");
+    _walkable      = _map.Grid.CreateBitLayer("walkable");
     _units         = _map.Grid.CreateCellIndex("units");
 
     _walkable.SetAll(true);
 
     _table   = _map.CreateTable("units");
     _nameCol = _table.CreateStringColumn("name");
-    _hpCol   = _table.CreateColumn("hp", DetType.Int);
+    _hpCol   = _table.CreateIntColumn("hp");
 
     _pathfinder = new DetPathfinder(64, 64);
     _paths      = _map.CreatePathStore("unitPaths");
@@ -720,7 +724,7 @@ public sealed class RandomWalkerExample : MonoBehaviour
     [SerializeField] private uint randomSeed = 123456789;
 
     private DetSpatialDatabase _map = null!;
-    private DetBooleanLayer _walkable = null!;
+    private DetBitLayer _walkable = null!;
     private DetCellIndex _units = null!;
     private DetTable _workers = null!;
     private DetStringColumn _nameColumn = null!;
@@ -737,15 +741,15 @@ public sealed class RandomWalkerExample : MonoBehaviour
         _rngState = randomSeed;
 
         _map = new DetSpatialDatabase(mapWidth, mapHeight);
-        _walkable = _map.Grid.CreateBooleanLayer("walkable");
+        _walkable = _map.Grid.CreateBitLayer("walkable");
         _walkable.SetAll(true);
 
         _units = _map.Grid.CreateCellIndex("units");
 
         _workers = _map.CreateTable("workers");
         _nameColumn = _workers.CreateStringColumn("name");
-        _posXColumn = _workers.CreateColumn("posX", DetType.Int);
-        _posYColumn = _workers.CreateColumn("posY", DetType.Int);
+        _posXColumn = _workers.CreateIntColumn("posX");
+        _posYColumn = _workers.CreateIntColumn("posY");
 
         _paths = _map.CreatePathStore("workerPaths");
         _pathfinder = new DetPathfinder(mapWidth, mapHeight);
@@ -918,13 +922,19 @@ DetSpatialDatabase.FromBytes(byte[] data) // DetSnapshot.Deserialize(data)
 ```csharp
 grid.Width / grid.Height
 grid.InBounds(int x, int y)             // bool
-grid.CreateValueLayer<T>(name, DetType<T>)  // DetValueLayer<T>
-grid.CreateBooleanLayer(name)               // DetBooleanLayer
+grid.CreateByteLayer(name)              // DetValueLayer<byte>
+grid.CreateIntLayer(name)               // DetValueLayer<int>
+grid.CreateFix64Layer(name)             // DetValueLayer<Fix64>
+grid.CreateBitLayer(name)               // DetBitLayer
+grid.CreateValueLayer<T>(name, DetType<T>)  // low-level generic factory
 grid.CreateCellIndex(name)            // DetCellIndex
 grid.CreateTagLayer(name)               // DetTagLayer
 grid.CreateFlowLayer(name)              // DetFlowLayer
-grid.GetValueLayer<T>(name)             // DetValueLayer<T>
-grid.GetBooleanLayer(name)                  // DetBooleanLayer
+grid.GetByteLayer(name)                 // DetValueLayer<byte>
+grid.GetIntLayer(name)                  // DetValueLayer<int>
+grid.GetFix64Layer(name)                // DetValueLayer<Fix64>
+grid.GetValueLayer<T>(name)             // low-level generic getter
+grid.GetBitLayer(name)                  // DetBitLayer
 grid.GetCellIndex(name)               // DetCellIndex
 grid.GetTagLayer(name)                  // DetTagLayer
 grid.GetFlowLayer(name)                 // DetFlowLayer
@@ -944,13 +954,13 @@ layer.Dirty -> DirtyRect
 layer.ClearDirty()
 ```
 
-### DetBooleanLayer
+### DetBitLayer
 
 ```csharp
 layer.Get(int x, int y) -> bool
 layer.Set(int x, int y, bool value)
 layer.SetAll(bool value)
-DetBooleanLayer.And/Or/Xor(a, b, result)
+DetBitLayer.And/Or/Xor(a, b, result)
 ```
 
 ### DetCellIndex
@@ -990,9 +1000,15 @@ DetFlowLayer.Blocked = 255
 int  table.CreateRow()
 void table.DeleteRow(int id)
 bool table.RowExists(int id)
-DetColumn<T>    table.CreateColumn<T>(string name, DetType<T> type)  // T = byte | int | Fix64
+DetColumn<byte> table.CreateByteColumn(string name)
+DetColumn<int>  table.CreateIntColumn(string name)
+DetColumn<Fix64> table.CreateFix64Column(string name)
+DetColumn<T>    table.CreateColumn<T>(string name, DetType<T> type)  // low-level generic factory
 DetStringColumn table.CreateStringColumn(string name)
-DetColumn<T>    table.GetColumn<T>(string name)
+DetColumn<byte> table.GetByteColumn(string name)
+DetColumn<int>  table.GetIntColumn(string name)
+DetColumn<Fix64> table.GetFix64Column(string name)
+DetColumn<T>    table.GetColumn<T>(string name)                      // low-level generic getter
 DetStringColumn table.GetStringColumn(string name)
 IEnumerable<int> table.GetRowIds()        // 0..HighWater, existing rows only
 int table.HighWater
@@ -1019,7 +1035,7 @@ batch.SetByte(string tableName, string columnName, int rowId, byte value)
 batch.SetInt(string tableName, string columnName, int rowId, int value)
 batch.SetFix64(string tableName, string columnName, int rowId, Fix64 value)
 batch.SetString(string tableName, string columnName, int rowId, string? value)
-batch.SetBooleanCell(string layerName, int x, int y, bool value)
+batch.SetBitCell(string layerName, int x, int y, bool value)
 batch.SetByteCell(string layerName, int x, int y, byte value)
 batch.SetIntCell(string layerName, int x, int y, int value)
 batch.SetFix64Cell(string layerName, int x, int y, Fix64 value)
@@ -1036,7 +1052,7 @@ batch.Count
 ```csharp
 new DetPathfinder(int width, int height)
 DetPath pf.FindPath(int sx, int sy, int gx, int gy,
-    DetBooleanLayer walkable,
+    DetBitLayer walkable,
     DetValueLayer<byte>? unitCount = null,
     int maxSearchNodes = 2048)
 

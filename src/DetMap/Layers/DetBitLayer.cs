@@ -2,17 +2,17 @@ using DetMap.Core;
 
 namespace DetMap.Layers;
 
-public sealed class DetBooleanLayer : IDetLayer, IDetReadable<bool>
+public sealed class DetBitLayer : IDetLayer, IDetReadable<bool>
 {
     private readonly ulong[] _bits;
     private readonly int _width;
     private readonly int _height;
 
     public string Name { get; }
-    public DetLayerKind Kind => DetLayerKind.Boolean;
+    public DetLayerKind Kind => DetLayerKind.Bit;
     public DirtyRect Dirty { get; private set; }
 
-    public DetBooleanLayer(string name, int width, int height)
+    public DetBitLayer(string name, int width, int height)
     {
         Name = name;
         _width = width;
@@ -46,19 +46,19 @@ public sealed class DetBooleanLayer : IDetLayer, IDetReadable<bool>
         Array.Fill(_bits, fill);
     }
 
-    public static void And(DetBooleanLayer a, DetBooleanLayer b, DetBooleanLayer result)
+    public static void And(DetBitLayer a, DetBitLayer b, DetBitLayer result)
     {
         for (int i = 0; i < result._bits.Length; i++)
             result._bits[i] = a._bits[i] & b._bits[i];
     }
 
-    public static void Or(DetBooleanLayer a, DetBooleanLayer b, DetBooleanLayer result)
+    public static void Or(DetBitLayer a, DetBitLayer b, DetBitLayer result)
     {
         for (int i = 0; i < result._bits.Length; i++)
             result._bits[i] = a._bits[i] | b._bits[i];
     }
 
-    public static void Xor(DetBooleanLayer a, DetBooleanLayer b, DetBooleanLayer result)
+    public static void Xor(DetBitLayer a, DetBitLayer b, DetBitLayer result)
     {
         for (int i = 0; i < result._bits.Length; i++)
             result._bits[i] = a._bits[i] ^ b._bits[i];

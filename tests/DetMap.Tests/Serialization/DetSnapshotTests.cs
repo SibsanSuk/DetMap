@@ -16,10 +16,10 @@ public class DetSnapshotTests
         var map = new DetSpatialDatabase(16, 16);
 
         // layers of every kind
-        var byteLayer = map.Grid.CreateValueLayer("flags",    DetType.Byte);
-        var intLayer  = map.Grid.CreateValueLayer("ids",      DetType.Int);
-        var f64Layer  = map.Grid.CreateValueLayer("height",   DetType.Fix64);
-        var bitLayer  = map.Grid.CreateBooleanLayer("walkable");
+        var byteLayer = map.Grid.CreateByteLayer("flags");
+        var intLayer  = map.Grid.CreateIntLayer("ids");
+        var f64Layer  = map.Grid.CreateFix64Layer("height");
+        var bitLayer  = map.Grid.CreateBitLayer("walkable");
         var entities  = map.Grid.CreateCellIndex("units");
         var tags      = map.Grid.CreateTagLayer("services");
         var flow      = map.Grid.CreateFlowLayer("flowA");
@@ -42,9 +42,9 @@ public class DetSnapshotTests
         // table with every col kind
         var chars   = map.CreateTable("heroes");
         var nameCol = chars.CreateStringColumn("name");
-        var hpCol   = chars.CreateColumn("hp", DetType.Int);
-        var lvlCol  = chars.CreateColumn("level", DetType.Byte);
-        var xpCol   = chars.CreateColumn("xp", DetType.Fix64);
+        var hpCol   = chars.CreateIntColumn("hp");
+        var lvlCol  = chars.CreateByteColumn("level");
+        var xpCol   = chars.CreateFix64Column("xp");
 
         int id0 = chars.CreateRow();
         nameCol.Set(id0, "Alice");
@@ -61,7 +61,7 @@ public class DetSnapshotTests
         chars.DeleteRow(id0); // creates a free-list entry
 
         // path store
-        var walkable2 = map.Grid.GetBooleanLayer("walkable");
+        var walkable2 = map.Grid.GetBitLayer("walkable");
         var pf        = new DetPathfinder(16, 16);
         var paths     = map.CreatePathStore("unitPaths");
         paths.Set(0, pf.FindPath(0, 0, 8, 8, walkable2));
@@ -106,8 +106,8 @@ public class DetSnapshotTests
     {
         var map = BuildFullMap();
         var map2 = DetSpatialDatabase.FromBytes(map.ToBytes());
-        var l1 = map.Grid.GetValueLayer<byte>("flags");
-        var l2 = map2.Grid.GetValueLayer<byte>("flags");
+        var l1 = map.Grid.GetByteLayer("flags");
+        var l2 = map2.Grid.GetByteLayer("flags");
         Assert.Equal(l1.Get(3, 4), l2.Get(3, 4));
         Assert.Equal(l1.Get(0, 0), l2.Get(0, 0));
     }
@@ -117,8 +117,8 @@ public class DetSnapshotTests
     {
         var map = BuildFullMap();
         var map2 = DetSpatialDatabase.FromBytes(map.ToBytes());
-        var l1 = map.Grid.GetValueLayer<int>("ids");
-        var l2 = map2.Grid.GetValueLayer<int>("ids");
+        var l1 = map.Grid.GetIntLayer("ids");
+        var l2 = map2.Grid.GetIntLayer("ids");
         Assert.Equal(l1.Get(7, 7), l2.Get(7, 7));
     }
 
@@ -127,8 +127,8 @@ public class DetSnapshotTests
     {
         var map = BuildFullMap();
         var map2 = DetSpatialDatabase.FromBytes(map.ToBytes());
-        var l1 = map.Grid.GetValueLayer<Fix64>("height");
-        var l2 = map2.Grid.GetValueLayer<Fix64>("height");
+        var l1 = map.Grid.GetFix64Layer("height");
+        var l2 = map2.Grid.GetFix64Layer("height");
         Assert.Equal(l1.Get(1, 2).RawValue, l2.Get(1, 2).RawValue);
     }
 
@@ -137,8 +137,8 @@ public class DetSnapshotTests
     {
         var map = BuildFullMap();
         var map2 = DetSpatialDatabase.FromBytes(map.ToBytes());
-        var w1 = map.Grid.GetBooleanLayer("walkable");
-        var w2 = map2.Grid.GetBooleanLayer("walkable");
+        var w1 = map.Grid.GetBitLayer("walkable");
+        var w2 = map2.Grid.GetBitLayer("walkable");
         Assert.True(w1.Get(0, 0));
         Assert.Equal(w1.Get(0, 0),  w2.Get(0, 0));
         Assert.Equal(w1.Get(5, 5),  w2.Get(5, 5)); // false
@@ -225,7 +225,7 @@ public class DetSnapshotTests
     {
         var map = BuildFullMap();
         var map2 = DetSpatialDatabase.FromBytes(map.ToBytes());
-        var hpCol = map2.GetTable("heroes").GetColumn<int>("hp");
+        var hpCol = map2.GetTable("heroes").GetIntColumn("hp");
         Assert.Equal(80, hpCol.Get(1));
     }
 
@@ -234,7 +234,7 @@ public class DetSnapshotTests
     {
         var map = BuildFullMap();
         var map2 = DetSpatialDatabase.FromBytes(map.ToBytes());
-        var lvlCol = map2.GetTable("heroes").GetColumn<byte>("level");
+        var lvlCol = map2.GetTable("heroes").GetByteColumn("level");
         Assert.Equal((byte)3, lvlCol.Get(1));
     }
 
@@ -243,8 +243,8 @@ public class DetSnapshotTests
     {
         var map = BuildFullMap();
         var map2 = DetSpatialDatabase.FromBytes(map.ToBytes());
-        var xpCol1 = map.GetTable("heroes").GetColumn<Fix64>("xp");
-        var xpCol2 = map2.GetTable("heroes").GetColumn<Fix64>("xp");
+        var xpCol1 = map.GetTable("heroes").GetFix64Column("xp");
+        var xpCol2 = map2.GetTable("heroes").GetFix64Column("xp");
         Assert.Equal(xpCol1.Get(1).RawValue, xpCol2.Get(1).RawValue);
     }
 

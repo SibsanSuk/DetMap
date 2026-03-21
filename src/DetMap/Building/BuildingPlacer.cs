@@ -12,7 +12,7 @@ public static class BuildingPlacer
         int ox, int oy,
         BuildingDefinition def,
         DetValueLayer<int> buildingLayer,
-        DetBooleanLayer walkable,
+        DetBitLayer walkable,
         CellPredicate? extraCheck = null)
     {
         for (int ly = 0; ly < def.H; ly++)
@@ -32,7 +32,7 @@ public static class BuildingPlacer
         int ox, int oy,
         BuildingDefinition def,
         DetValueLayer<int> buildingLayer,
-        DetBooleanLayer walkable)
+        DetBitLayer walkable)
     {
         int id = def.BuildingTypeId;
         for (int ly = 0; ly < def.H; ly++)
@@ -50,7 +50,7 @@ public static class BuildingPlacer
         int ox, int oy,
         BuildingDefinition def,
         DetValueLayer<int> buildingLayer,
-        DetBooleanLayer walkable)
+        DetBitLayer walkable)
     {
         for (int ly = 0; ly < def.H; ly++)
         for (int lx = 0; lx < def.W; lx++)

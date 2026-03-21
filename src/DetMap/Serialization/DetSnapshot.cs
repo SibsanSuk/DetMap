@@ -182,10 +182,10 @@ public static class DetSnapshot
     private static IDetLayer CreateLayerFromKind(DetSpatialDatabase database, DetLayerKind kind, string name)
         => kind switch
         {
-            DetLayerKind.ValueByte  => database.Grid.CreateValueLayer(name, DetType.Byte),
-            DetLayerKind.ValueInt   => database.Grid.CreateValueLayer(name, DetType.Int),
-            DetLayerKind.ValueFix64 => database.Grid.CreateValueLayer(name, DetType.Fix64),
-            DetLayerKind.Boolean => database.Grid.CreateBooleanLayer(name),
+            DetLayerKind.ValueByte  => database.Grid.CreateByteLayer(name),
+            DetLayerKind.ValueInt   => database.Grid.CreateIntLayer(name),
+            DetLayerKind.ValueFix64 => database.Grid.CreateFix64Layer(name),
+            DetLayerKind.Bit        => database.Grid.CreateBitLayer(name),
             DetLayerKind.CellIndex => database.Grid.CreateCellIndex(name),
             DetLayerKind.Tag => database.Grid.CreateTagLayer(name),
             DetLayerKind.Flow => database.Grid.CreateFlowLayer(name),
@@ -196,10 +196,10 @@ public static class DetSnapshot
     {
         switch (kind)
         {
-            case DetColumnKind.Byte:   table.CreateColumn(colName, DetType.Byte);   break;
-            case DetColumnKind.Int:    table.CreateColumn(colName, DetType.Int);    break;
-            case DetColumnKind.Fix64:  table.CreateColumn(colName, DetType.Fix64);  break;
-            case DetColumnKind.String: table.CreateStringColumn(colName);           break;
+            case DetColumnKind.Byte:   table.CreateByteColumn(colName);   break;
+            case DetColumnKind.Int:    table.CreateIntColumn(colName);    break;
+            case DetColumnKind.Fix64:  table.CreateFix64Column(colName);  break;
+            case DetColumnKind.String: table.CreateStringColumn(colName); break;
             default: throw new InvalidDataException($"Unknown col kind: {(byte)kind}");
         }
     }

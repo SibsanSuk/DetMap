@@ -15,14 +15,14 @@ public class DetMapIntegrationTests
     {
         var map = new DetSpatialDatabase(64, 64);
 
-        var building = map.Grid.CreateValueLayer("building", DetType.Int);
-        var walkable = map.Grid.CreateBooleanLayer("walkable");
+        var building = map.Grid.CreateIntLayer("building");
+        var walkable = map.Grid.CreateBitLayer("walkable");
         walkable.SetAll(true);
 
         var units = map.Grid.CreateCellIndex("units");
         var chars = map.CreateTable("characters");
         var nameCol = chars.CreateStringColumn("name");
-        var jobCol = chars.CreateColumn("job", DetType.Byte);
+        var jobCol = chars.CreateByteColumn("job");
         var paths = map.CreatePathStore("unitPaths");
 
         map.SetGlobal("treasury", Fix64.FromInt(1000));

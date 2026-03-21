@@ -1,3 +1,4 @@
+using DetMath;
 using DetMap.Layers;
 using DetMap.Schema;
 
@@ -17,6 +18,9 @@ public sealed class DetGrid
         Height = height;
     }
 
+    /// <summary>
+    /// Low-level generic layer factory. Prefer the typed helpers when the value kind is known.
+    /// </summary>
     /// <param name="type">Use <see cref="DetType.Byte"/>, <see cref="DetType.Int"/>, or <see cref="DetType.Fix64"/>.</param>
     public DetValueLayer<T> CreateValueLayer<T>(string name, DetType<T> type, T defaultValue = default)
         where T : unmanaged
@@ -27,9 +31,18 @@ public sealed class DetGrid
         return layer;
     }
 
-    public DetBooleanLayer CreateBooleanLayer(string name)
+    public DetValueLayer<byte> CreateByteLayer(string name, byte defaultValue = default)
+        => CreateValueLayer(name, DetType.Byte, defaultValue);
+
+    public DetValueLayer<int> CreateIntLayer(string name, int defaultValue = default)
+        => CreateValueLayer(name, DetType.Int, defaultValue);
+
+    public DetValueLayer<Fix64> CreateFix64Layer(string name, Fix64 defaultValue = default)
+        => CreateValueLayer(name, DetType.Fix64, defaultValue);
+
+    public DetBitLayer CreateBitLayer(string name)
     {
-        var layer = new DetBooleanLayer(name, Width, Height);
+        var layer = new DetBitLayer(name, Width, Height);
         _layers[name] = layer;
         AddLayerName(name);
         return layer;
@@ -62,8 +75,17 @@ public sealed class DetGrid
     public DetValueLayer<T> GetValueLayer<T>(string name) where T : unmanaged
         => (DetValueLayer<T>)_layers[name];
 
-    public DetBooleanLayer GetBooleanLayer(string name)
-        => (DetBooleanLayer)_layers[name];
+    public DetValueLayer<byte> GetByteLayer(string name)
+        => (DetValueLayer<byte>)_layers[name];
+
+    public DetValueLayer<int> GetIntLayer(string name)
+        => (DetValueLayer<int>)_layers[name];
+
+    public DetValueLayer<Fix64> GetFix64Layer(string name)
+        => (DetValueLayer<Fix64>)_layers[name];
+
+    public DetBitLayer GetBitLayer(string name)
+        => (DetBitLayer)_layers[name];
 
     public DetCellIndex GetCellIndex(string name)
         => (DetCellIndex)_layers[name];
