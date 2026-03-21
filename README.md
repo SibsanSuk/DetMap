@@ -1,19 +1,23 @@
 # DetMap
 
-A deterministic in-memory spatial database for city-builder and RTS games built on C# / Unity.
+A deterministic, inspectable in-memory spatial database for 2D simulation worlds built on C# / Unity.
 
-Every read and write goes through **Fix64** fixed-point arithmetic (no `float`, no `double` in game logic), so simulation state is **bit-identical across all platforms** — Windows, macOS, Linux, iOS, Android, WebGL.
+DetMap is built for projects where scene hierarchies stop being a useful debugging tool: city-builders, RTS games, logistics sims, military sims, and other data-heavy worlds with hundreds or thousands of rows of state.
+
+Simulation math uses **Fix64** fixed-point arithmetic, and database values are restricted to deterministic scalar types (`byte`, `int`, `Fix64`), so the same input produces the same state across platforms.
 
 ---
 
 ## Table of Contents
 
+- [Why DetMap](#why-detmap)
+- [Modeling Data](#modeling-data)
 - [Architecture](#architecture)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Layers](#layers)
   - [DetValueLayer\<T\> — dense value grid](#detvaluelayert--dense-value-grid)
-  - [DetBitLayer — packed booleans](#detbooleanlayer--packed-booleans)
+  - [DetBitLayer — packed booleans](#detbitlayer--packed-booleans)
   - [DetCellIndex — spatial row index](#detcellindex--spatial-row-index)
   - [DetTagLayer — multi-tag per cell](#dettaglayer--multi-tag-per-cell)
   - [DetFlowLayer — direction + cost grid](#detflowlayer--direction--cost-grid)
@@ -28,6 +32,35 @@ Every read and write goes through **Fix64** fixed-point arithmetic (no `float`, 
 - [Determinism Reference](#determinism-reference)
 - [Unity Integration](#unity-integration)
 - [API Quick Reference](#api-quick-reference)
+
+---
+
+## Why DetMap
+
+- **Inspectable by default.** State lives in tables and layers instead of being hidden across large GameObject graphs.
+- **Deterministic by design.** `Fix64`, stable row IDs, deterministic ordering, and binary snapshots make replay and lockstep practical.
+- **Built for tooling.** Schema metadata and `DetSnapshot` let you save a frame and inspect it outside the running game.
+- **Designed for large state.** Dense per-cell data goes into layers; sparse gameplay records go into tables.
+
+If your main pain is “the game has too much state to reason about in the editor,” DetMap is aimed at that problem first.
+
+---
+
+## Modeling Data
+
+Use this rule of thumb:
+
+- `Layer`: data attached to cells. Examples: `height`, `terrainType`, `walkable`, `fertility`.
+- `Table`: sparse rows you want humans and systems to inspect. Examples: `units`, `buildings`, `resourceStacks`, `jobs`.
+- `CellIndex`: spatial lookup for table rows. Example: “which unit rows are in cell `(10,5)`?”
+- `PathStore`: derived movement payload keyed by row id. Example: the current A* path for a worker.
+- `DetSnapshot`: save/load boundary for debugging, replay, and offline inspection.
+
+Typical modeling pattern:
+
+- Keep business truth in `Table` columns and `Layer` values.
+- Add `CellIndex` when you need fast row-by-cell lookup.
+- Use `PathStore` for runtime path payload, not as your main business record.
 
 ---
 
@@ -89,62 +122,48 @@ Snapshot viewer note: [docs/SNAPSHOT_VIEWER.md](docs/SNAPSHOT_VIEWER.md)
 
 ```csharp
 using DetMath;
-using DetMap.Building;
 using DetMap.Core;
 using DetMap.Layers;
-using DetMap.Pathfinding;
 using DetMap.Tables;
 
-// 1. Create a 64×64 map
-var map = new DetSpatialDatabase(64, 64);
+// 1. Create the database
+var db = new DetSpatialDatabase(64, 64);
 
-// 2. Create layers
-var building  = map.Grid.CreateIntLayer("building");
-var height    = map.Grid.CreateFix64Layer("height");
-var walkable  = map.Grid.CreateBitLayer("walkable");
-var units     = map.Grid.CreateCellIndex("units");
-var services  = map.Grid.CreateTagLayer("services");
-
+// 2. Create dense cell data
+var height   = db.Grid.CreateFix64Layer("height");
+var walkable = db.Grid.CreateBitLayer("walkable");
 walkable.SetAll(true);
 
-// 3. Set global state
-map.SetGlobal("treasury",   Fix64.FromInt(1000));
-map.SetGlobal("population", Fix64.FromInt(0));
+// 3. Create sparse row data
+var units      = db.CreateTable("units");
+var unitName   = units.CreateStringColumn("name");
+var unitHp     = units.CreateIntColumn("hp");
+var unitCells  = db.Grid.CreateCellIndex("unitsByCell");
 
-// 4. Create a table
-var chars   = map.CreateTable("characters");
-var nameCol = chars.CreateStringColumn("name");
-var jobCol  = chars.CreateByteColumn("job");
-var hpCol   = chars.CreateIntColumn("hp");
+// 4. Add one row
+int rowId = units.CreateRow();
+unitName.Set(rowId, "Alice");
+unitHp.Set(rowId, 100);
+unitCells.Place(rowId, 5, 5);
+height.Set(5, 5, Fix64.FromInt(2));
 
-// 5. Place a building
-var houseDef = new BuildingDefinition("house", 2, 2, 1);
-BuildingPlacer.Place(map.Grid, 10, 10, houseDef, building, walkable);
+// 5. Save a snapshot for replay or inspection
+byte[] snapshot = db.ToBytes();
 
-// 6. Create rows and place them
-int id = chars.CreateRow();
-nameCol.Set(id, "Alice");
-jobCol.Set(id, 0);
-hpCol.Set(id, 100);
-units.Place(id, 5, 5);
-
-// 7. Pathfind
-var pf = new DetPathfinder(64, 64);
-var path = pf.FindPath(5, 5, 30, 30, walkable);
-
-// 8. Simulation tick
-map.AdvanceTick();
-
-// 9. Move a row along its path
-var pathStore = map.CreatePathStore("unitPaths");
-pathStore.Set(id, path);
-ref DetPath p = ref pathStore.Get(id);
-if (p.IsValid && !p.IsComplete) { p.Advance(); var (nx, ny) = p.Current(64); }
-
-// 10. Save / Load
-byte[] save = map.ToBytes();
-var loaded  = DetSpatialDatabase.FromBytes(save);
+// 6. Load it back
+var restored = DetSpatialDatabase.FromBytes(snapshot);
+int hp = restored.GetTable("units").GetIntColumn("hp").Get(rowId);
+bool canWalk = restored.Grid.GetBitLayer("walkable").Get(5, 5);
 ```
+
+What this shows:
+
+- `Layer` stores per-cell world data.
+- `Table` stores inspectable row state.
+- `CellIndex` answers spatial lookup questions fast.
+- `DetSnapshot` is the portable save/inspect boundary.
+
+The rest of this README expands each piece in detail.
 
 ---
 
@@ -593,7 +612,7 @@ Fix64     xp    = chars.GetFix64Column("xp").Get(0);
 
 ```text
 [4 bytes]  magic: 'D','M','A','P'
-[2 bytes]  version: 1
+[2 bytes]  version: 2
 ── SCHEMA ─────────────────────────────────────
 [4]  grid width
 [4]  grid height
@@ -604,12 +623,15 @@ Fix64     xp    = chars.GetFix64Column("xp").Get(0);
        per col: [1] kind  [str] name
 [4]  global count  (keys in ordinal-sorted order)
      per global: [str] key
+[4]  pathstore count
+     per pathstore: [str] name
 ── DATA ────────────────────────────────────────
 [8]  tick (ulong)
      layer data × N  (raw bytes, schema order)
      global Fix64.RawValue × G  (schema order)
      per table: [4] highWater  [4] freeCount  freeList[]
                 alive col data  user col data × colCount
+     pathstore data × P
 ```
 
 **What is saved:** layers, globals, tables, path stores, tick.
