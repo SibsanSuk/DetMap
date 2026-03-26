@@ -2,14 +2,12 @@ using DetMap.Core;
 
 namespace DetMap.Query;
 
-public delegate bool CellPredicate(DetGrid grid, int x, int y);
-
 public static class QueryEngine
 {
     public static int RectQuery(
         DetGrid grid,
         int minX, int minY, int maxX, int maxY,
-        CellPredicate predicate,
+        DetCellPredicate predicate,
         CellHit[] resultBuffer)
     {
         int count = 0;
@@ -26,7 +24,7 @@ public static class QueryEngine
     public static int RadiusQuery(
         DetGrid grid,
         int cx, int cy, int radius,
-        CellPredicate predicate,
+        DetCellPredicate predicate,
         CellHit[] resultBuffer)
     {
         int count = 0;
@@ -46,7 +44,7 @@ public static class QueryEngine
     public static int FloodFill(
         DetGrid grid,
         int startX, int startY,
-        CellPredicate canSpread,
+        DetCellPredicate canSpread,
         CellHit[] resultBuffer)
     {
         if (!grid.InBounds(startX, startY) || !canSpread(grid, startX, startY))
@@ -65,13 +63,32 @@ public static class QueryEngine
 
             resultBuffer[count++] = new CellHit(x, y);
 
-            foreach (var (dx, dy) in new[] { (0,-1),(1,0),(0,1),(-1,0) })
-            {
-                int nx = x + dx, ny = y + dy;
-                if (grid.InBounds(nx, ny) && !visited.Contains(ny * grid.Width + nx) && canSpread(grid, nx, ny))
-                    queue.Enqueue((nx, ny));
-            }
+            EnqueueNeighbor(grid, canSpread, visited, queue, x, y - 1);
+            EnqueueNeighbor(grid, canSpread, visited, queue, x + 1, y);
+            EnqueueNeighbor(grid, canSpread, visited, queue, x, y + 1);
+            EnqueueNeighbor(grid, canSpread, visited, queue, x - 1, y);
         }
         return count;
+    }
+
+    private static void EnqueueNeighbor(
+        DetGrid grid,
+        DetCellPredicate canSpread,
+        HashSet<int> visited,
+        Queue<(int x, int y)> queue,
+        int x,
+        int y)
+    {
+        if (!grid.InBounds(x, y))
+            return;
+
+        int key = y * grid.Width + x;
+        if (visited.Contains(key))
+            return;
+
+        if (!canSpread(grid, x, y))
+            return;
+
+        queue.Enqueue((x, y));
     }
 }

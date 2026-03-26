@@ -36,8 +36,8 @@ public class DetGridTests
     public void CreateLayer_RetrievedByName()
     {
         var grid = new DetGrid(8, 8);
-        var layer = grid.CreateValueLayer("building", DetType.Int);
-        var retrieved = grid.GetValueLayer<int>("building");
+        var layer = grid.CreateValueLayer("placements", DetType.Int);
+        var retrieved = grid.GetValueLayer<int>("placements");
         Assert.Same(layer, retrieved);
     }
 
@@ -47,11 +47,11 @@ public class DetGridTests
         var grid = new DetGrid(8, 8);
 
         var byteLayer = grid.CreateByteLayer("flags");
-        var intLayer = grid.CreateIntLayer("building");
+        var intLayer = grid.CreateIntLayer("placements");
         var fix64Layer = grid.CreateFix64Layer("height");
 
         Assert.Same(byteLayer, grid.GetByteLayer("flags"));
-        Assert.Same(intLayer, grid.GetIntLayer("building"));
+        Assert.Same(intLayer, grid.GetIntLayer("placements"));
         Assert.Same(fix64Layer, grid.GetFix64Layer("height"));
     }
 
@@ -95,7 +95,7 @@ public class DetGridTests
     public void AllLayers_ContainsAllCreated()
     {
         var grid = new DetGrid(8, 8);
-        grid.CreateValueLayer("building", DetType.Int);
+        grid.CreateValueLayer("placements", DetType.Int);
         grid.CreateBitLayer("walkable");
         grid.CreateCellIndex("units");
         Assert.Equal(3, grid.AllLayers.Count);

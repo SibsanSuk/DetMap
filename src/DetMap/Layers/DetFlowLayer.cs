@@ -52,6 +52,16 @@ public sealed class DetFlowLayer : IDetLayer, IDetReadable<byte>
         Array.Fill(_cost, InfiniteCost);
     }
 
+    public void CopyFrom(DetFlowLayer source)
+    {
+        if (source._width != _width || source._height != _height || source._dir.Length != _dir.Length)
+            throw new InvalidOperationException($"Cannot copy layer '{source.Name}' into '{Name}' with different dimensions.");
+
+        Array.Copy(source._dir, _dir, _dir.Length);
+        Array.Copy(source._cost, _cost, _cost.Length);
+        Dirty = default;
+    }
+
     public void ClearDirty()
     {
         var dirty = Dirty;

@@ -71,6 +71,15 @@ public sealed class DetTagLayer : IDetLayer, IDetSpatial
         return _cellTags.TryGetValue(cell, out var list) ? list : Array.Empty<string>();
     }
 
+    public void CopyFrom(DetTagLayer source)
+    {
+        _cellTags.Clear();
+        foreach (var kv in source._cellTags)
+            _cellTags[kv.Key] = new List<string>(kv.Value);
+
+        Dirty = default;
+    }
+
     public void ClearDirty()
     {
         var dirty = Dirty;

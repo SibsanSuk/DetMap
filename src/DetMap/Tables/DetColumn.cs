@@ -13,6 +13,8 @@ public enum DetColumnKind : byte
 public interface IDetColumnData
 {
     DetColumnKind Kind { get; }
+    void ResetRow(int id);
+    void CopyFrom(IDetColumnData source);
     void WriteToStream(BinaryWriter bw);
     void ReadFromStream(BinaryReader br);
 }
@@ -20,6 +22,7 @@ public interface IDetColumnData
 public sealed class DetColumn<T> : IDetColumnData where T : unmanaged
 {
     private T[] _data;
+    private event Action<int, T, T>? ValueChanged;
 
     public DetColumnKind Kind =>
         typeof(T) == typeof(byte)  ? DetColumnKind.Byte  :
@@ -34,7 +37,26 @@ public sealed class DetColumn<T> : IDetColumnData where T : unmanaged
     public void Set(int id, T value)
     {
         EnsureCapacity(id);
+        T oldValue = _data[id];
         _data[id] = value;
+        ValueChanged?.Invoke(id, oldValue, value);
+    }
+
+    public void ResetRow(int id)
+    {
+        EnsureCapacity(id);
+        _data[id] = default;
+    }
+
+    public void CopyFrom(IDetColumnData source)
+    {
+        if (source is not DetColumn<T> typedSource)
+            throw new InvalidOperationException($"Cannot copy {source.GetType().Name} into DetColumn<{typeof(T).Name}>.");
+
+        if (_data.Length != typedSource._data.Length)
+            _data = new T[typedSource._data.Length];
+
+        typedSource._data.AsSpan().CopyTo(_data);
     }
 
     private void EnsureCapacity(int id)
@@ -55,6 +77,9 @@ public sealed class DetColumn<T> : IDetColumnData where T : unmanaged
         _data = new T[len];
         for (int i = 0; i < len; i++) _data[i] = ReadValue(br);
     }
+
+    internal void RegisterValueChanged(Action<int, T, T> callback)
+        => ValueChanged += callback;
 
     private static void WriteValue(BinaryWriter bw, T value)
     {
@@ -87,6 +112,23 @@ public sealed class DetStringColumn : IDetColumnData
     {
         EnsureCapacity(id);
         _data[id] = value;
+    }
+
+    public void ResetRow(int id)
+    {
+        EnsureCapacity(id);
+        _data[id] = null;
+    }
+
+    public void CopyFrom(IDetColumnData source)
+    {
+        if (source is not DetStringColumn typedSource)
+            throw new InvalidOperationException($"Cannot copy {source.GetType().Name} into DetStringColumn.");
+
+        if (_data.Length != typedSource._data.Length)
+            _data = new string?[typedSource._data.Length];
+
+        Array.Copy(typedSource._data, _data, typedSource._data.Length);
     }
 
     private void EnsureCapacity(int id)

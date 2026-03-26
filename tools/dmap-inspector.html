@@ -1,0 +1,5452 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DetMap Snapshot Inspector</title>
+  <style>
+    :root {
+      --bg: #eef2f6;
+      --bg-2: #dfe7ee;
+      --panel: rgba(255, 255, 255, 0.74);
+      --panel-2: rgba(245, 248, 251, 0.92);
+      --line: rgba(114, 136, 154, 0.20);
+      --line-strong: rgba(105, 123, 139, 0.34);
+      --ink: #1f2933;
+      --ink-soft: #667787;
+      --accent: #0a84ff;
+      --accent-2: #c78646;
+      --accent-3: #d5bf88;
+      --danger: #ff5f57;
+      --success: #28c840;
+      --accent-rgb: 10, 132, 255;
+      --accent-2-rgb: 199, 134, 70;
+      --accent-3-rgb: 213, 191, 136;
+      --danger-rgb: 255, 95, 87;
+      --success-rgb: 40, 200, 64;
+      --shadow: 0 28px 64px rgba(72, 90, 107, 0.16);
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 12px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", sans-serif;
+      --font-mono: "SFMono-Regular", Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top left, rgba(10, 132, 255, 0.10), transparent 28%),
+        radial-gradient(circle at top right, rgba(199, 134, 70, 0.08), transparent 26%),
+        linear-gradient(180deg, var(--bg), var(--bg-2));
+      color: var(--ink);
+      font-family: var(--font-sans);
+      overflow: hidden;
+    }
+
+    body {
+      padding: 16px;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    .app {
+      max-width: 1560px;
+      margin: 0 auto;
+      height: 100%;
+    }
+
+    .window-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+      border-radius: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      background: rgba(241, 245, 248, 0.72);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(26px) saturate(1.2);
+    }
+
+    .window-titlebar {
+      display: grid;
+      grid-template-columns: minmax(220px, 300px) 1fr auto;
+      align-items: center;
+      gap: 12px;
+      min-height: 48px;
+      padding: 0 14px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(239, 243, 247, 0.66));
+      border-bottom: 1px solid rgba(105, 123, 139, 0.14);
+      user-select: none;
+    }
+
+    .window-titlegroup {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .window-title {
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: rgba(31, 41, 51, 0.88);
+    }
+
+    .window-subtitle {
+      font-size: 11px;
+      color: rgba(102, 119, 135, 0.92);
+    }
+
+    .window-context {
+      justify-self: center;
+      min-width: 0;
+      text-align: center;
+      font-size: 11px;
+      color: rgba(76, 94, 108, 0.94);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .window-toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .window-body {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: 10px;
+      flex: 1 1 auto;
+      min-height: 0;
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .sidebar,
+    .main-panel,
+    .inspector-pane,
+    .empty-state,
+    .card,
+    .metric,
+    .toolbar,
+    .preview-panel,
+    .timeline-dock {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 0 10px 28px rgba(76, 95, 112, 0.08);
+      backdrop-filter: blur(18px);
+    }
+
+    .workspace-header {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 6px;
+      min-height: 0;
+    }
+
+    .header-pills {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 6px;
+      justify-content: flex-end;
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+    }
+
+    .timeline-dock {
+      border-radius: 18px;
+      padding: 8px 10px;
+      min-height: 56px;
+      overflow: auto;
+    }
+
+    .timeline-panel {
+      display: grid;
+      gap: 6px;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+      border-radius: 0;
+      padding: 0;
+    }
+
+    .timeline-transport {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 2px;
+      overscroll-behavior-x: contain;
+      scrollbar-width: thin;
+    }
+
+    .timeline-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .timeline-title {
+      margin: 0;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--ink-soft);
+    }
+
+    .timeline-subtitle {
+      margin: 3px 0 0;
+      color: var(--ink-soft);
+      font-size: 12px;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .timeline-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .timeline-range-wrap {
+      flex: 1;
+      min-width: 220px;
+    }
+
+    [data-drag-scroll="x"] {
+      touch-action: pan-x;
+    }
+
+    .header-pills[data-drag-scroll="x"],
+    .timeline-transport[data-drag-scroll="x"] {
+      cursor: grab;
+    }
+
+    .drag-scrolling {
+      cursor: grabbing !important;
+      user-select: none;
+    }
+
+    .timeline-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+    }
+
+    .timeline-meta-card {
+      border-radius: 14px;
+      padding: 8px 10px;
+      background: rgba(243, 247, 250, 0.84);
+      border: 1px solid rgba(133, 148, 160, 0.14);
+    }
+
+    .timeline-meta-card strong {
+      display: block;
+      font-size: 14px;
+      letter-spacing: -0.03em;
+      margin-top: 2px;
+    }
+
+    .timeline-empty {
+      color: var(--ink-soft);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .timeline-dock .button {
+      padding: 7px 11px;
+      font-size: 11px;
+      border-radius: 9px;
+    }
+
+    .timeline-dock .control {
+      min-width: 112px;
+      gap: 3px;
+    }
+
+    .timeline-dock .control label,
+    .timeline-dock .toggle,
+    .timeline-dock .metric-label {
+      font-size: 10px;
+    }
+
+    .timeline-dock select {
+      min-height: 32px;
+      padding: 6px 9px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .button,
+    .nav-item,
+    .toggle,
+    select,
+    input[type="text"],
+    input[type="number"],
+    input[type="range"] {
+      font: inherit;
+    }
+
+    .button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 15px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border-color 140ms ease;
+    }
+
+    .button.primary {
+      background: linear-gradient(180deg, #2190ff, #0a84ff);
+      color: white;
+      box-shadow: 0 10px 18px rgba(10, 132, 255, 0.24);
+    }
+
+    .button.secondary {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(236, 242, 246, 0.92));
+      color: var(--ink);
+      border: 1px solid rgba(120, 138, 153, 0.18);
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+    }
+
+    .button.toolbar {
+      padding: 7px 11px;
+      font-size: 11px;
+      border-radius: 9px;
+    }
+
+    .button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr) 320px;
+      gap: 0;
+      height: 100%;
+      min-height: 0;
+      border: 1px solid rgba(120, 138, 153, 0.14);
+      border-radius: 22px;
+      overflow: hidden;
+      background: rgba(252, 254, 255, 0.36);
+    }
+
+    .sidebar {
+      border-radius: 0;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-height: 0;
+      overflow: auto;
+      overscroll-behavior: contain;
+      background: linear-gradient(180deg, rgba(247, 250, 252, 0.82), rgba(239, 244, 247, 0.78));
+      border-right: 1px solid rgba(120, 138, 153, 0.14);
+      box-shadow: none;
+    }
+
+    .sidebar-section h2 {
+      margin: 0 0 8px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-soft);
+    }
+
+    .nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .nav-item {
+      width: 100%;
+      text-align: left;
+      border: 1px solid transparent;
+      background: transparent;
+      padding: 9px 11px;
+      border-radius: 10px;
+      cursor: pointer;
+      color: var(--ink);
+      transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+    }
+
+    .nav-item:hover {
+      background: rgba(10, 132, 255, 0.07);
+      border-color: rgba(10, 132, 255, 0.14);
+      transform: none;
+    }
+
+    .nav-item.active {
+      background: linear-gradient(180deg, rgba(10, 132, 255, 0.16), rgba(10, 132, 255, 0.08));
+      border-color: rgba(10, 132, 255, 0.22);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+
+    .nav-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .nav-meta {
+      display: block;
+      color: var(--ink-soft);
+      font-size: 12px;
+      margin-top: 3px;
+    }
+
+    .main-panel {
+      border-radius: 0;
+      padding: 18px;
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      overscroll-behavior: contain;
+      background: linear-gradient(180deg, rgba(252, 254, 255, 0.9), rgba(247, 250, 252, 0.9));
+      box-shadow: none;
+    }
+
+    .inspector-pane {
+      border-radius: 0;
+      padding: 16px 14px;
+      min-height: 0;
+      border-left: 1px solid rgba(120, 138, 153, 0.14);
+      background: linear-gradient(180deg, rgba(247, 250, 252, 0.82), rgba(239, 244, 247, 0.78));
+      box-shadow: none;
+      overflow: auto;
+      overscroll-behavior: contain;
+    }
+
+    .inspector-header {
+      margin-bottom: 14px;
+    }
+
+    .inspector-header h2 {
+      margin: 0;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-soft);
+    }
+
+    .inspector-header p {
+      margin: 6px 0 0;
+      color: var(--ink-soft);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .inspector-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .inspector-empty {
+      border-radius: 14px;
+      border: 1px dashed rgba(120, 138, 153, 0.22);
+      padding: 14px;
+      color: var(--ink-soft);
+      font-size: 13px;
+      line-height: 1.6;
+      background: rgba(255, 255, 255, 0.36);
+    }
+
+    .view-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .view-header h2 {
+      margin: 0;
+      font-size: clamp(20px, 1.8vw, 28px);
+      letter-spacing: -0.04em;
+    }
+
+    .view-header p {
+      margin: 4px 0 0;
+      color: var(--ink-soft);
+      line-height: 1.45;
+      max-width: 820px;
+      font-size: 13px;
+    }
+
+    .summary-grid,
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .metric,
+    .card {
+      border-radius: var(--radius-md);
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.66);
+      border: 1px solid rgba(120, 138, 153, 0.12);
+      box-shadow: 0 8px 24px rgba(78, 94, 108, 0.06);
+    }
+
+    .metric-label {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--ink-soft);
+      margin-bottom: 10px;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .metric-sub {
+      color: var(--ink-soft);
+      margin-top: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 5px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(10, 132, 255, 0.09);
+      color: var(--accent);
+      border: 1px solid rgba(10, 132, 255, 0.14);
+    }
+
+    .pill.warn {
+      background: rgba(199, 134, 70, 0.10);
+      color: var(--accent-2);
+      border-color: rgba(199, 134, 70, 0.16);
+    }
+
+    .toolbar {
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.66);
+      border: 1px solid rgba(120, 138, 153, 0.12);
+      box-shadow: 0 8px 24px rgba(78, 94, 108, 0.05);
+    }
+
+    .sticky-toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      backdrop-filter: blur(18px);
+    }
+
+    .control {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 140px;
+    }
+
+    .control.wide {
+      flex: 1;
+      min-width: 240px;
+    }
+
+    .control label,
+    .toggle {
+      font-size: 11px;
+      color: var(--ink-soft);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      border-radius: 10px;
+      border: 1px solid rgba(120, 138, 153, 0.18);
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--ink);
+      padding: 8px 10px;
+      min-height: 36px;
+      outline: none;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    input:focus,
+    select:focus {
+      border-color: rgba(10, 132, 255, 0.46);
+      box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.12);
+    }
+
+    .table-shell {
+      border: 1px solid rgba(120, 138, 153, 0.14);
+      border-radius: 14px;
+      overflow: auto;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+
+    .table-shell tbody tr:hover {
+      background: rgba(10, 132, 255, 0.045);
+    }
+
+    tr.selected-row {
+      background: rgba(10, 132, 255, 0.10);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 700px;
+    }
+
+    th,
+    td {
+      padding: 11px 12px;
+      border-bottom: 1px solid rgba(120, 138, 153, 0.16);
+      vertical-align: top;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: rgba(243, 247, 250, 0.96);
+      z-index: 1;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-soft);
+    }
+
+    th.derived-column {
+      background: rgba(235, 244, 255, 0.97);
+    }
+
+    .column-header-cell {
+      display: grid;
+      gap: 5px;
+    }
+
+    .column-header-title {
+      display: block;
+      color: var(--ink-soft);
+    }
+
+    .column-header-meta {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    td.code,
+    .mono,
+    code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    tr.deleted {
+      opacity: 0.58;
+      background: rgba(var(--danger-rgb), 0.05);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 5px 8px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      border: 1px solid transparent;
+    }
+
+    .badge.ok {
+      color: var(--success);
+      background: rgba(var(--success-rgb), 0.10);
+      border-color: rgba(var(--success-rgb), 0.16);
+    }
+
+    .badge.warn {
+      color: var(--danger);
+      background: rgba(var(--danger-rgb), 0.08);
+      border-color: rgba(var(--danger-rgb), 0.16);
+    }
+
+    .badge.derived {
+      color: var(--accent);
+      background: rgba(var(--accent-rgb), 0.10);
+      border-color: rgba(var(--accent-rgb), 0.16);
+    }
+
+    .badge.locked {
+      color: var(--accent-2);
+      background: rgba(var(--accent-2-rgb), 0.10);
+      border-color: rgba(var(--accent-2-rgb), 0.18);
+    }
+
+    td.derived-cell {
+      background: rgba(var(--accent-rgb), 0.035);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: minmax(360px, 520px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .preview-panel {
+      border-radius: 16px;
+      padding: 14px;
+      min-width: 0;
+      background: rgba(255, 255, 255, 0.66);
+      border: 1px solid rgba(120, 138, 153, 0.12);
+      box-shadow: 0 8px 24px rgba(78, 94, 108, 0.05);
+    }
+
+    .preview-canvas-wrap {
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(45deg, #eef3f6 25%, transparent 25%, transparent 75%, #eef3f6 75%),
+        linear-gradient(45deg, #eef3f6 25%, transparent 25%, transparent 75%, #eef3f6 75%);
+      background-size: 18px 18px;
+      background-position: 0 0, 9px 9px;
+    }
+
+    .map-layout {
+      display: grid;
+      grid-template-columns: minmax(420px, 1fr) 320px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .map-stage-panel {
+      display: grid;
+      gap: 12px;
+    }
+
+    .map-stage-toolbar {
+      margin-bottom: 0;
+    }
+
+    .map-stage-toolbar .control {
+      min-width: 108px;
+    }
+
+    .map-layer-stack {
+      display: grid;
+      gap: 12px;
+      max-height: calc(100dvh - 280px);
+      overflow: auto;
+      overscroll-behavior: contain;
+      padding-right: 2px;
+    }
+
+    .map-stack-toolbar {
+      margin-bottom: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .map-stack-group {
+      display: grid;
+      gap: 8px;
+    }
+
+    .map-stack-group-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--ink-soft);
+      font-weight: 700;
+      padding: 0 2px;
+    }
+
+    .map-layer-item {
+      display: grid;
+      gap: 6px;
+      padding: 10px 11px;
+      border-radius: 12px;
+      background: rgba(248, 251, 253, 0.92);
+      border: 1px solid rgba(120, 138, 153, 0.16);
+    }
+
+    .map-layer-item.hidden {
+      opacity: 0.62;
+    }
+
+    .map-layer-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .map-layer-toggle {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      margin: 0;
+    }
+
+    .map-layer-name {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .map-layer-meta {
+      font-size: 12px;
+      color: var(--ink-soft);
+      line-height: 1.45;
+    }
+
+    .map-layer-kind {
+      justify-self: end;
+    }
+
+    .map-layer-visibility {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 4px 7px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-soft);
+      background: rgba(120, 138, 153, 0.08);
+      border: 1px solid rgba(120, 138, 153, 0.14);
+    }
+
+    .map-layer-item:not(.hidden) .map-layer-visibility {
+      color: var(--accent);
+      background: rgba(var(--accent-rgb), 0.09);
+      border-color: rgba(var(--accent-rgb), 0.16);
+    }
+
+    .map-layer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .map-layer-transparency {
+      appearance: none;
+      border: 1px solid rgba(120, 138, 153, 0.16);
+      background: rgba(120, 138, 153, 0.06);
+      color: var(--ink-soft);
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+    }
+
+    .map-layer-transparency.active {
+      color: var(--accent);
+      background: rgba(var(--accent-rgb), 0.10);
+      border-color: rgba(var(--accent-rgb), 0.18);
+    }
+
+    .map-layer-ramp {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(120, 138, 153, 0.06);
+      border: 1px solid rgba(120, 138, 153, 0.12);
+    }
+
+    .map-layer-ramp-label {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+    }
+
+    .map-layer-color {
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .map-inspector-group {
+      display: grid;
+      gap: 10px;
+    }
+
+    .map-inspector-section {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(250, 252, 253, 0.88);
+      border: 1px solid rgba(120, 138, 153, 0.12);
+    }
+
+    .map-inspector-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--ink-soft);
+      font-weight: 800;
+    }
+
+    .map-inspector-item {
+      display: grid;
+      gap: 6px;
+      padding: 10px 11px;
+      border-radius: 12px;
+      background: rgba(242, 246, 249, 0.75);
+      border: 1px solid rgba(120, 138, 153, 0.10);
+    }
+
+    .map-inspector-item-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .map-inspector-item-title {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .map-inspector-values {
+      display: grid;
+      gap: 6px;
+    }
+
+    .map-inspector-value {
+      display: grid;
+      grid-template-columns: 110px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .map-inspector-value-label {
+      color: var(--ink-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 10px;
+      font-weight: 700;
+      padding-top: 2px;
+    }
+
+    .map-inspector-meta-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      image-rendering: pixelated;
+      cursor: crosshair;
+      background: #f7fbfd;
+    }
+
+    .detail-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .detail-row {
+      padding: 11px 12px;
+      border-radius: 12px;
+      background: rgba(237, 242, 245, 0.70);
+      border: 1px solid rgba(207, 216, 223, 0.62);
+    }
+
+    .detail-label {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--ink-soft);
+      margin-bottom: 6px;
+    }
+
+    .detail-value {
+      font-weight: 700;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .layout-mask-value {
+      font-weight: 600;
+    }
+
+    .layout-mask {
+      margin: 0;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(201, 210, 218, 0.82);
+      background: rgba(246, 249, 252, 0.96);
+      color: var(--ink-strong);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.35;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    .layout-mask-meta {
+      margin-top: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--ink-soft);
+    }
+
+    .derived-note {
+      margin-top: 8px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .path-step-list {
+      display: grid;
+      gap: 6px;
+      margin-top: 2px;
+    }
+
+    .path-step-item {
+      padding: 7px 9px;
+      border-radius: 10px;
+      background: rgba(247, 250, 252, 0.96);
+      border: 1px solid rgba(207, 216, 223, 0.72);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .path-step-item.current {
+      background: rgba(var(--accent-rgb), 0.12);
+      border-color: rgba(var(--accent-rgb), 0.42);
+      box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.18);
+    }
+
+    .path-step-index {
+      color: var(--ink-soft);
+      margin-right: 8px;
+    }
+
+    .path-step-arrow {
+      color: var(--ink-soft);
+      margin: 0 6px;
+    }
+
+    .empty-state {
+      border-radius: 24px;
+      padding: 48px 30px;
+      text-align: center;
+      min-height: 500px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 18px;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(var(--accent-rgb), 0.14), transparent 34%),
+        rgba(251, 252, 253, 0.95);
+    }
+
+    .empty-state h2 {
+      margin: 0;
+      font-size: clamp(28px, 2.7vw, 44px);
+      letter-spacing: -0.05em;
+    }
+
+    .empty-state p {
+      margin: 0 auto;
+      max-width: 620px;
+      color: var(--ink-soft);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    .drop-target {
+      border: 2px dashed rgba(var(--accent-rgb), 0.30);
+      border-radius: 22px;
+      padding: 26px;
+      background: rgba(var(--accent-rgb), 0.05);
+    }
+
+    .drop-target.drag {
+      border-color: rgba(var(--accent-rgb), 0.70);
+      background: rgba(var(--accent-rgb), 0.10);
+    }
+
+    .flash-error {
+      margin-bottom: 16px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: rgba(var(--danger-rgb), 0.10);
+      color: #8f3f39;
+      border: 1px solid rgba(var(--danger-rgb), 0.18);
+      font-weight: 700;
+    }
+
+    .flash-info {
+      margin-bottom: 16px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: rgba(var(--accent-rgb), 0.07);
+      color: var(--accent);
+      border: 1px solid rgba(var(--accent-rgb), 0.16);
+      font-weight: 700;
+    }
+
+    .footer-note {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--ink-soft);
+      line-height: 1.6;
+    }
+
+    @media (max-width: 1120px) {
+      .window-titlebar {
+        grid-template-columns: 1fr;
+        justify-items: stretch;
+        gap: 6px;
+        padding: 10px 14px;
+      }
+
+      .window-context,
+      .window-toolbar-actions {
+        justify-self: start;
+        text-align: left;
+      }
+
+      .window-toolbar-actions {
+        flex-wrap: wrap;
+      }
+
+      .workspace-header,
+      .workspace,
+      .split {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        order: 2;
+        border-right: 0;
+        border-top: 1px solid rgba(120, 138, 153, 0.14);
+      }
+
+      .inspector-pane {
+        border-left: 0;
+        border-top: 1px solid rgba(120, 138, 153, 0.14);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="window-shell">
+      <div class="window-titlebar">
+        <div class="window-titlegroup">
+          <div class="window-title">DetMap Snapshot Inspector</div>
+          <div class="window-subtitle">Offline Snapshot Workspace</div>
+        </div>
+        <div class="window-context" id="windowContext">No snapshot loaded</div>
+        <div class="window-toolbar-actions">
+          <button class="button primary toolbar" id="openFileButton">Open Snapshot</button>
+          <button class="button secondary toolbar" id="openFolderButton">Open Folder</button>
+          <button class="button secondary toolbar" id="resetViewButton">Reset View</button>
+        </div>
+      </div>
+
+      <div class="window-body">
+        <div class="workspace-header">
+          <div id="headerSummary" class="header-pills" data-drag-scroll="x"></div>
+        </div>
+
+        <div class="workspace">
+          <aside class="sidebar" id="sidebar"></aside>
+          <main class="main-panel" id="mainPanel"></main>
+          <aside class="inspector-pane" id="inspectorPanel"></aside>
+        </div>
+
+        <div id="timelinePanel" class="timeline-dock"></div>
+      </div>
+    </div>
+  </div>
+
+  <input id="fileInput" type="file" accept=".dmap,application/octet-stream" hidden />
+  <input id="folderInput" type="file" accept=".dmap,application/octet-stream" webkitdirectory directory multiple hidden />
+
+  <script>
+    const FIX64_SCALE = 100n;
+    const LONG_MAX = 9223372036854775807n;
+    const layerKindNames = {
+      0: "ValueByte",
+      1: "ValueInt",
+      2: "ValueFix64",
+      3: "Bit",
+      4: "CellIndex",
+      5: "Tag",
+      6: "Flow",
+    };
+    const columnKindNames = {
+      0: "Byte",
+      1: "Int",
+      2: "Fix64",
+      3: "String",
+    };
+    const dbCommandKindNames = {
+      0: "SetGlobalFix64",
+      1: "CreateRow",
+      2: "DeleteRow",
+      3: "SetByteColumn",
+      4: "SetIntColumn",
+      5: "SetFix64Column",
+      6: "SetStringColumn",
+      7: "SetBitCell",
+      8: "SetByteCell",
+      9: "SetIntCell",
+      10: "SetFix64Cell",
+      11: "PlaceRow",
+      12: "MoveRow",
+      13: "RemoveRow",
+    };
+    const directionNames = {
+      0: "North",
+      1: "East",
+      2: "South",
+      3: "West",
+      4: "North-East",
+      5: "South-East",
+      6: "South-West",
+      7: "North-West",
+      255: "Blocked",
+    };
+
+    const state = {
+      snapshot: null,
+      error: null,
+      info: "Load a .dmap file to inspect one snapshot, or open a folder of frames to browse the simulation as a timeline.",
+      view: { type: "summary" },
+      timeline: null,
+      mapUi: null,
+      tableUi: {},
+      layerUi: {},
+      storeUi: {},
+      frameUi: null,
+    };
+
+    const fileInput = document.getElementById("fileInput");
+    const folderInput = document.getElementById("folderInput");
+    const openFileButton = document.getElementById("openFileButton");
+    const openFolderButton = document.getElementById("openFolderButton");
+    const resetViewButton = document.getElementById("resetViewButton");
+    const sidebar = document.getElementById("sidebar");
+    const mainPanel = document.getElementById("mainPanel");
+    const inspectorPanel = document.getElementById("inspectorPanel");
+    const headerSummary = document.getElementById("headerSummary");
+    const timelinePanel = document.getElementById("timelinePanel");
+    const windowContext = document.getElementById("windowContext");
+
+    openFileButton.addEventListener("click", () => fileInput.click());
+    openFolderButton.addEventListener("click", () => folderInput.click());
+    resetViewButton.addEventListener("click", () => {
+      state.view = { type: "summary" };
+      state.error = null;
+      render();
+    });
+
+    fileInput.addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (file) {
+        await loadSnapshotFile(file);
+      }
+      event.target.value = "";
+    });
+
+    folderInput.addEventListener("change", async (event) => {
+      const files = Array.from(event.target.files || []);
+      if (files.length > 0) {
+        await loadSnapshotFiles(files, describeFileSetSource(files));
+      }
+      event.target.value = "";
+    });
+
+    window.addEventListener("dragover", (event) => {
+      event.preventDefault();
+    });
+
+    window.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      const files = Array.from((event.dataTransfer && event.dataTransfer.files) || []);
+      if (files.length === 1) {
+        await loadSnapshotFile(files[0]);
+      } else if (files.length > 1) {
+        await loadSnapshotFiles(files, describeFileSetSource(files));
+      }
+    });
+
+    wireDragScrollableElements(document);
+    render();
+
+    async function loadSnapshotFile(file) {
+      stopTimelinePlayback();
+      try {
+        resetUiCaches();
+        const buffer = await file.arrayBuffer();
+        state.timeline = null;
+        const snapshot = parseSnapshot(buffer, file.webkitRelativePath || file.name);
+        snapshot.stateHashHex = await computeSnapshotStateHashHex(buffer, snapshot.tickOffset, snapshot.stateEndOffset);
+        state.snapshot = snapshot;
+        state.error = null;
+        state.info = `Loaded ${baseName(state.snapshot.fileName)}.`;
+        state.view = { type: "summary" };
+      } catch (error) {
+        state.error = error instanceof Error ? error.message : String(error);
+      }
+      render();
+    }
+
+    async function loadSnapshotFiles(files, sourceLabel) {
+      const snapshotFiles = files.filter((file) => isSnapshotFile(file.name));
+      if (snapshotFiles.length === 0) {
+        state.error = "No .dmap files were found in the selected folder.";
+        render();
+        return;
+      }
+
+      stopTimelinePlayback();
+      state.error = null;
+      state.info = `Loading ${snapshotFiles.length} snapshots...`;
+      render();
+
+      try {
+        const parsedFrames = [];
+        for (const file of snapshotFiles) {
+          const buffer = await file.arrayBuffer();
+          const snapshot = parseSnapshot(buffer, file.webkitRelativePath || file.name);
+          snapshot.stateHashHex = await computeSnapshotStateHashHex(buffer, snapshot.tickOffset, snapshot.stateEndOffset);
+          parsedFrames.push(snapshot);
+        }
+
+        const frames = finalizeTimelineFrames(parsedFrames);
+        if (frames.length === 0) {
+          throw new Error("The selected folder did not produce any readable DetSnapshot frames.");
+        }
+
+        resetUiCaches();
+        state.view = { type: "summary" };
+        state.error = null;
+
+        if (frames.length === 1) {
+          state.timeline = null;
+          state.snapshot = frames[0];
+          state.info = `Loaded 1 snapshot from ${sourceLabel}.`;
+        } else {
+          state.timeline = {
+            frames,
+            currentIndex: 0,
+            isPlaying: false,
+            playbackMs: 250,
+            loop: true,
+            timerId: null,
+            sourceLabel,
+          };
+          state.snapshot = frames[0];
+          state.info = `Loaded ${frames.length} frames from ${sourceLabel}.`;
+        }
+      } catch (error) {
+        state.error = error instanceof Error ? error.message : String(error);
+      }
+
+      render();
+    }
+
+    function render(options = {}) {
+      const preserveUi = Boolean(options.preserveUi);
+      const preservedUiState = preserveUi ? captureTransientUiState() : null;
+      normalizeViewForSnapshot();
+      renderHeaderSummary();
+      renderSidebar();
+      renderMain();
+      renderInspector();
+      renderTimelinePanel();
+      if (preservedUiState) {
+        restoreTransientUiState(preservedUiState);
+      }
+    }
+
+    function renderFrameChange() {
+      const preservedUiState = captureTransientUiState();
+      normalizeViewForSnapshot();
+      renderHeaderSummary();
+
+      if (!tryPatchCurrentMainView()) {
+        render({ preserveUi: true });
+        return;
+      }
+
+      renderInspector();
+      renderTimelinePanel();
+      restoreTransientUiState(preservedUiState);
+    }
+
+    function refreshMapPresentation() {
+      if (!state.snapshot || state.view.type !== "map") {
+        render({ preserveUi: true });
+        return;
+      }
+
+      const preservedUiState = captureTransientUiState();
+      if (!tryPatchMapView(state.snapshot)) {
+        render({ preserveUi: true });
+        return;
+      }
+
+      renderInspector();
+      restoreTransientUiState(preservedUiState);
+    }
+
+    function refreshTablePresentation() {
+      if (!state.snapshot || state.view.type !== "table") {
+        render({ preserveUi: true });
+        return;
+      }
+
+      const preservedUiState = captureTransientUiState();
+      const table = getRequiredTable(state.snapshot, state.view.name);
+      if (!tryPatchTableView(table)) {
+        render({ preserveUi: true });
+        return;
+      }
+
+      renderInspector();
+      restoreTransientUiState(preservedUiState);
+    }
+
+    function wireDragScrollableElements(root = document) {
+      root.querySelectorAll('[data-drag-scroll="x"]').forEach((element) => {
+        if (element.dataset.dragScrollBound === "true") {
+          return;
+        }
+
+        let pointerId = null;
+        let startX = 0;
+        let startScrollLeft = 0;
+        let cancelClick = false;
+
+        const endDrag = (event) => {
+          if (pointerId !== event.pointerId) {
+            return;
+          }
+          pointerId = null;
+          element.classList.remove("drag-scrolling");
+          window.setTimeout(() => {
+            cancelClick = false;
+          }, 0);
+        };
+
+        element.dataset.dragScrollBound = "true";
+        element.addEventListener("pointerdown", (event) => {
+          if (event.button !== 0 || element.scrollWidth <= element.clientWidth) {
+            return;
+          }
+          if (event.target.closest('input[type="range"], select, input[type="checkbox"]')) {
+            return;
+          }
+
+          pointerId = event.pointerId;
+          startX = event.clientX;
+          startScrollLeft = element.scrollLeft;
+          cancelClick = false;
+          element.setPointerCapture?.(pointerId);
+        });
+        element.addEventListener("pointermove", (event) => {
+          if (pointerId !== event.pointerId) {
+            return;
+          }
+
+          const deltaX = event.clientX - startX;
+          if (!cancelClick && Math.abs(deltaX) < 4) {
+            return;
+          }
+
+          cancelClick = true;
+          element.classList.add("drag-scrolling");
+          element.scrollLeft = startScrollLeft - deltaX;
+        });
+        element.addEventListener("pointerup", endDrag);
+        element.addEventListener("pointercancel", endDrag);
+        element.addEventListener("lostpointercapture", endDrag);
+        element.addEventListener("click", (event) => {
+          if (!cancelClick) {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+        }, true);
+      });
+    }
+
+    function captureTransientUiState() {
+      return {
+        windowX: window.scrollX,
+        windowY: window.scrollY,
+        sidebar: captureElementScroll(sidebar),
+        mainPanel: captureElementScroll(mainPanel),
+        inspectorPanel: captureElementScroll(inspectorPanel),
+        timelinePanel: captureElementScroll(timelinePanel),
+        mainPanelTableShells: captureIndexedScrollState(mainPanel, ".table-shell"),
+        inspectorPanelTableShells: captureIndexedScrollState(inspectorPanel, ".table-shell"),
+      };
+    }
+
+    function captureElementScroll(element) {
+      if (!element) {
+        return null;
+      }
+      return { top: element.scrollTop, left: element.scrollLeft };
+    }
+
+    function captureIndexedScrollState(root, selector) {
+      if (!root) {
+        return [];
+      }
+
+      return Array.from(root.querySelectorAll(selector)).map((element, index) => ({
+        index,
+        top: element.scrollTop,
+        left: element.scrollLeft,
+      }));
+    }
+
+    function restoreTransientUiState(uiState) {
+      window.requestAnimationFrame(() => {
+        restoreElementScroll(sidebar, uiState.sidebar);
+        restoreElementScroll(mainPanel, uiState.mainPanel);
+        restoreElementScroll(inspectorPanel, uiState.inspectorPanel);
+        restoreElementScroll(timelinePanel, uiState.timelinePanel);
+        restoreIndexedScrollState(mainPanel, ".table-shell", uiState.mainPanelTableShells);
+        restoreIndexedScrollState(inspectorPanel, ".table-shell", uiState.inspectorPanelTableShells);
+        window.scrollTo(uiState.windowX, uiState.windowY);
+      });
+    }
+
+    function restoreElementScroll(element, scrollState) {
+      if (!element || !scrollState) {
+        return;
+      }
+      element.scrollTop = scrollState.top;
+      element.scrollLeft = scrollState.left;
+    }
+
+    function restoreIndexedScrollState(root, selector, items) {
+      if (!root || !items || items.length === 0) {
+        return;
+      }
+
+      const elements = root.querySelectorAll(selector);
+      items.forEach((item) => {
+        const element = elements[item.index];
+        if (!element) {
+          return;
+        }
+        element.scrollTop = item.top;
+        element.scrollLeft = item.left;
+      });
+    }
+
+    function renderHeaderSummary() {
+      if (!state.snapshot) {
+        windowContext.textContent = "No snapshot loaded";
+        headerSummary.innerHTML = "";
+        return;
+      }
+
+      const snapshot = state.snapshot;
+      windowContext.textContent = state.timeline
+        ? `Frame ${state.timeline.currentIndex + 1}/${state.timeline.frames.length} • Tick ${formatBigInt(snapshot.tick)} • ${baseName(snapshot.fileName)}`
+        : `${baseName(snapshot.fileName)} • Tick ${formatBigInt(snapshot.tick)} • ${snapshot.width}x${snapshot.height}`;
+      headerSummary.innerHTML = `
+        <span class="pill">${state.timeline ? "Timeline" : "Single Snapshot"}</span>
+        <span class="pill">${escapeHtml(baseName(snapshot.fileName))}</span>
+        <span class="pill">Tick ${formatBigInt(snapshot.tick)}</span>
+        <span class="pill">State ${escapeHtml(formatShortStateHash(snapshot.stateHashHex))}</span>
+        <span class="pill">${snapshot.width} x ${snapshot.height}</span>
+        <span class="pill">${snapshot.tables.length} tables</span>
+        <span class="pill">${snapshot.layers.length} layers</span>
+        <span class="pill">${snapshot.stores.length} stores</span>
+        ${state.timeline ? `<span class="pill ${snapshot.stateMatchesPrevious ? "" : "warn"}">${escapeHtml(describeStateChange(snapshot, state.timeline.currentIndex === 0))}</span>` : ""}
+        ${state.timeline ? `<span class="pill warn">Frame ${state.timeline.currentIndex + 1} / ${state.timeline.frames.length}</span>` : ""}
+      `;
+    }
+
+    function renderTimelinePanel() {
+      if (!state.snapshot) {
+        timelinePanel.dataset.mode = "empty";
+        timelinePanel.innerHTML = `
+          <div class="timeline-panel">
+            <div class="timeline-empty">
+              Timeline mode becomes available when you open a folder of <code>.dmap</code> frames.
+              Use it to scrub across ticks, compare rows over time, and play the sequence offline.
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (!state.timeline) {
+        timelinePanel.dataset.mode = "single";
+        timelinePanel.innerHTML = `
+          <div class="timeline-panel">
+            <div class="timeline-header">
+              <div>
+                <h2 class="timeline-title">Single Snapshot</h2>
+                <p class="timeline-subtitle">
+                  ${escapeHtml(baseName(state.snapshot.fileName))} is loaded as a standalone frame.
+                  Open a folder to enable timeline playback.
+                </p>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (patchTimelinePanel()) {
+        return;
+      }
+
+      const timeline = state.timeline;
+      const currentFrame = timeline.frames[timeline.currentIndex];
+      const firstFrame = timeline.frames[0];
+      const lastFrame = timeline.frames[timeline.frames.length - 1];
+
+      timelinePanel.dataset.mode = "timeline";
+      timelinePanel.innerHTML = `
+        <div class="timeline-header">
+          <div>
+            <h2 class="timeline-title">Timeline</h2>
+            <p class="timeline-subtitle">
+              <span id="timelineSourceLabel">${escapeHtml(timeline.sourceLabel)}</span> · frames ordered by snapshot tick.
+              Current file: <code id="timelineCurrentFileName">${escapeHtml(currentFrame.fileName)}</code>
+            </p>
+          </div>
+          <div class="pill-row" style="margin-top:0;">
+            <span class="pill" id="timelineTickRangePill">Ticks ${formatBigInt(firstFrame.tick)} -> ${formatBigInt(lastFrame.tick)}</span>
+            <span class="pill" id="timelinePlayStatePill">${timeline.isPlaying ? "Playing" : "Paused"}</span>
+            <span class="pill ${currentFrame.stateMatchesPrevious ? "" : "warn"}" id="timelineStateChangePill">${escapeHtml(describeStateChange(currentFrame, timeline.currentIndex === 0))}</span>
+          </div>
+        </div>
+
+        <div class="timeline-transport" data-drag-scroll="x">
+          <button class="button primary" id="timelinePlayPauseButton">${timeline.isPlaying ? "Pause" : "Play"}</button>
+          <button class="button secondary" id="timelinePrevButton" ${timeline.currentIndex === 0 ? "disabled" : ""}>Prev</button>
+          <button class="button secondary" id="timelineNextButton" ${timeline.currentIndex >= timeline.frames.length - 1 && !timeline.loop ? "disabled" : ""}>Next</button>
+          <div class="timeline-range-wrap">
+            <input id="timelineRange" type="range" min="0" max="${timeline.frames.length - 1}" value="${timeline.currentIndex}" step="1" />
+          </div>
+          <div class="control" style="min-width:120px;">
+            <label for="timelineSpeed">Playback</label>
+            <select id="timelineSpeed">
+              <option value="120" ${timeline.playbackMs === 120 ? "selected" : ""}>Fast</option>
+              <option value="250" ${timeline.playbackMs === 250 ? "selected" : ""}>Normal</option>
+              <option value="500" ${timeline.playbackMs === 500 ? "selected" : ""}>Slow</option>
+              <option value="1000" ${timeline.playbackMs === 1000 ? "selected" : ""}>Very Slow</option>
+            </select>
+          </div>
+          <div class="control">
+            <label class="toggle"><input id="timelineLoop" type="checkbox" ${timeline.loop ? "checked" : ""} /> Loop playback</label>
+          </div>
+        </div>
+      `;
+
+      wireTimelineInteractions();
+      wireDragScrollableElements(timelinePanel);
+    }
+
+    function patchTimelinePanel() {
+      if (!state.timeline || timelinePanel.dataset.mode !== "timeline") {
+        return false;
+      }
+
+      const timeline = state.timeline;
+      const currentFrame = timeline.frames[timeline.currentIndex];
+      const firstFrame = timeline.frames[0];
+      const lastFrame = timeline.frames[timeline.frames.length - 1];
+
+      const sourceLabel = document.getElementById("timelineSourceLabel");
+      const currentFileName = document.getElementById("timelineCurrentFileName");
+      const tickRangePill = document.getElementById("timelineTickRangePill");
+      const playStatePill = document.getElementById("timelinePlayStatePill");
+      const stateChangePill = document.getElementById("timelineStateChangePill");
+      const playPauseButton = document.getElementById("timelinePlayPauseButton");
+      const prevButton = document.getElementById("timelinePrevButton");
+      const nextButton = document.getElementById("timelineNextButton");
+      const range = document.getElementById("timelineRange");
+      const speed = document.getElementById("timelineSpeed");
+      const loop = document.getElementById("timelineLoop");
+
+      if (!sourceLabel || !currentFileName || !tickRangePill || !playStatePill || !stateChangePill || !playPauseButton || !prevButton || !nextButton || !range || !speed || !loop) {
+        return false;
+      }
+
+      sourceLabel.textContent = timeline.sourceLabel;
+      currentFileName.textContent = currentFrame.fileName;
+      tickRangePill.textContent = `Ticks ${formatBigInt(firstFrame.tick)} -> ${formatBigInt(lastFrame.tick)}`;
+      playStatePill.textContent = timeline.isPlaying ? "Playing" : "Paused";
+      stateChangePill.textContent = describeStateChange(currentFrame, timeline.currentIndex === 0);
+      stateChangePill.className = `pill${currentFrame.stateMatchesPrevious ? "" : " warn"}`;
+      playPauseButton.textContent = timeline.isPlaying ? "Pause" : "Play";
+      prevButton.disabled = timeline.currentIndex === 0;
+      nextButton.disabled = timeline.currentIndex >= timeline.frames.length - 1 && !timeline.loop;
+      range.max = String(timeline.frames.length - 1);
+      range.value = String(timeline.currentIndex);
+      speed.value = String(timeline.playbackMs);
+      loop.checked = timeline.loop;
+      return true;
+    }
+
+    function renderSidebar() {
+      if (!state.snapshot) {
+        sidebar.innerHTML = `
+          <div class="sidebar-section">
+            <h2>Navigator</h2>
+            <div class="nav-list">
+              <button class="nav-item active">
+                <span class="nav-label">No snapshot loaded</span>
+                <span class="nav-meta">Open a .dmap file or folder to populate the navigator.</span>
+              </button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      const snapshot = state.snapshot;
+      sidebar.innerHTML = `
+        <div class="sidebar-section">
+          <h2>Primary</h2>
+          <div class="nav-list">
+            ${navButton({ type: "summary" }, "Snapshot Summary", `${snapshot.width} x ${snapshot.height}, tick ${formatBigInt(snapshot.tick)}`)}
+            ${navButton({ type: "map" }, "Map", `${snapshot.layers.length} layers, ${snapshot.stores.length} stores`)}
+            ${navButton({ type: "globals" }, "Globals", `${snapshot.globals.length} values`)}
+            ${navButton(
+              { type: "frame" },
+              "Db Commands",
+              snapshot.frameRecord
+                ? `${snapshot.frameRecord.commandCount} commands`
+                : `Not stored in snapshot v${snapshot.version}`
+            )}
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <h2>Tables</h2>
+          <div class="nav-list">
+            ${snapshot.tables.map((table) =>
+              navButton({ type: "table", name: table.name }, table.name, `${table.existingCount}/${table.highWater} live rows`)
+            ).join("")}
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <h2>Layers</h2>
+          <div class="nav-list">
+            ${snapshot.layers.map((layer) =>
+              navButton({ type: "layer", name: layer.name }, layer.name, layer.kindLabel)
+            ).join("")}
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <h2>Stores</h2>
+          <div class="nav-list">
+            ${snapshot.stores.length === 0
+              ? `<button class="nav-item"><span class="nav-label">No stores</span><span class="nav-meta">This snapshot has no store payloads.</span></button>`
+              : snapshot.stores.map((store) =>
+                navButton({ type: "store", name: store.name }, store.name, `${store.kindLabel}, ${store.nonEmptyEntries.length} active`)
+              ).join("")
+            }
+          </div>
+        </div>
+      `;
+
+      sidebar.querySelectorAll("[data-view]").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.view = JSON.parse(button.dataset.view);
+          render();
+        });
+      });
+    }
+
+    function navButton(view, label, meta) {
+      const active = isViewActive(view) ? "active" : "";
+      return `
+        <button class="nav-item ${active}" data-view='${escapeAttr(JSON.stringify(view))}'>
+          <span class="nav-label">${escapeHtml(label)}</span>
+          <span class="nav-meta">${escapeHtml(meta)}</span>
+        </button>
+      `;
+    }
+
+    function isViewActive(view) {
+      return JSON.stringify(state.view) === JSON.stringify(view);
+    }
+
+    function renderMain() {
+      if (!state.snapshot) {
+        mainPanel.innerHTML = `
+          ${state.error ? `<div class="flash-error">${escapeHtml(state.error)}</div>` : ""}
+          ${state.info ? `<div class="flash-info">${escapeHtml(state.info)}</div>` : ""}
+          <section class="empty-state">
+            <div class="drop-target" id="dropTarget">
+              <h2>Load a DetSnapshot</h2>
+              <p>
+                Open or drag a <code>.dmap</code> file for a single frame, or choose a folder of snapshots
+                to browse the simulation as a timeline. The inspector validates magic and version,
+                parses the database, and renders tables, layers, globals, and stores without a server.
+              </p>
+              <div class="button-row" style="justify-content:center; margin-top: 18px;">
+                <button class="button primary" id="emptyOpenButton">Choose File</button>
+                <button class="button secondary" id="emptyOpenFolderButton">Choose Folder</button>
+              </div>
+              <div class="footer-note">
+                Recommended input: a snapshot generated from the settlement demo under
+                <code>artifacts/settlement-demo/...</code>
+              </div>
+            </div>
+          </section>
+        `;
+        const emptyOpenButton = document.getElementById("emptyOpenButton");
+        if (emptyOpenButton) {
+          emptyOpenButton.addEventListener("click", () => fileInput.click());
+        }
+        const emptyOpenFolderButton = document.getElementById("emptyOpenFolderButton");
+        if (emptyOpenFolderButton) {
+          emptyOpenFolderButton.addEventListener("click", () => folderInput.click());
+        }
+        const dropTarget = document.getElementById("dropTarget");
+        if (dropTarget) {
+          dropTarget.addEventListener("dragenter", () => dropTarget.classList.add("drag"));
+          dropTarget.addEventListener("dragleave", () => dropTarget.classList.remove("drag"));
+          dropTarget.addEventListener("drop", () => dropTarget.classList.remove("drag"));
+        }
+        return;
+      }
+
+      const snapshot = state.snapshot;
+      const errorMarkup = state.error ? `<div class="flash-error">${escapeHtml(state.error)}</div>` : "";
+      const infoMarkup = state.info ? `<div class="flash-info">${escapeHtml(state.info)}</div>` : "";
+      let body = "";
+
+      if (state.view.type === "summary") {
+        body = renderSummaryView(snapshot);
+      } else if (state.view.type === "map") {
+        body = renderMapView(snapshot);
+      } else if (state.view.type === "globals") {
+        body = renderGlobalsView(snapshot);
+      } else if (state.view.type === "frame") {
+        body = renderFrameView(snapshot);
+      } else if (state.view.type === "table") {
+        body = renderTableView(getRequiredTable(snapshot, state.view.name));
+      } else if (state.view.type === "layer") {
+        body = renderLayerView(getRequiredLayer(snapshot, state.view.name));
+      } else if (state.view.type === "store") {
+        body = renderStoreView(getRequiredStore(snapshot, state.view.name));
+      } else {
+        body = `<div class="flash-error">Unknown view state.</div>`;
+      }
+
+      mainPanel.innerHTML = errorMarkup + infoMarkup + body;
+      wireMainViewInteractions();
+    }
+
+    function renderInspector() {
+      if (!state.snapshot) {
+        inspectorPanel.innerHTML = `
+          <div class="inspector-header">
+            <h2>Inspector</h2>
+            <p>No snapshot is loaded.</p>
+          </div>
+          <div class="inspector-empty">
+            Open a snapshot or a folder of frames to inspect rows, cells, and path entries.
+          </div>
+        `;
+        return;
+      }
+
+      const snapshot = state.snapshot;
+      let headerTitle = "Inspector";
+      let headerText = "Selection details for the current view.";
+      let body = "";
+
+      if (state.view.type === "summary") {
+        headerTitle = "Snapshot";
+        headerText = "Core session details for the currently loaded frame.";
+        body = `
+          <div class="inspector-stack">
+            ${renderInspectorCard("File", escapeHtml(baseName(snapshot.fileName)))}
+            ${renderInspectorCard("Tick", formatBigInt(snapshot.tick), true)}
+            ${renderInspectorCard("State Hash", snapshot.stateHashHex || "Computing...", true)}
+            ${renderInspectorCard("State Change", describeStateChange(snapshot, !state.timeline || state.timeline.currentIndex === 0))}
+            ${renderInspectorCard("Grid", `${snapshot.width} x ${snapshot.height}`)}
+            ${renderInspectorCard("Tables", String(snapshot.tables.length))}
+            ${renderInspectorCard("Layers", String(snapshot.layers.length))}
+            ${renderInspectorCard("Stores", String(snapshot.stores.length))}
+            ${renderInspectorCard("Db Commands", String(snapshot.frameRecord ? snapshot.frameRecord.commandCount : 0))}
+            ${state.timeline ? renderInspectorCard("Timeline", `${state.timeline.currentIndex + 1} / ${state.timeline.frames.length}`) : ""}
+          </div>
+        `;
+      } else if (state.view.type === "globals") {
+        headerTitle = "Globals";
+        headerText = "Root-level values stored on the database.";
+        body = snapshot.globals.length
+          ? `<div class="inspector-stack">${snapshot.globals.slice(0, 12).map((globalValue) =>
+              renderInspectorCard(globalValue.key, `${globalValue.displayValue} (${formatBigInt(globalValue.rawValue)})`, true)
+            ).join("")}</div>`
+          : `<div class="inspector-empty">No globals are stored in this snapshot.</div>`;
+      } else if (state.view.type === "frame") {
+        const frameRecord = snapshot.frameRecord;
+        const ui = getFrameUi();
+        const selectedCommand = resolveSelectedFrameCommand(frameRecord, ui);
+        headerTitle = "Db Commands";
+        headerText = selectedCommand
+          ? `${selectedCommand.kindLabel} at order ${selectedCommand.order}.`
+          : "Commands that produced the current snapshot.";
+        body = frameRecord
+          ? renderFrameInspector(frameRecord, selectedCommand)
+          : `<div class="inspector-empty">This snapshot does not contain persisted DB commands.</div>`;
+      } else if (state.view.type === "table") {
+        const table = getRequiredTable(snapshot, state.view.name);
+        const ui = getTableUi(table.name);
+        const filteredRows = buildFilteredTableRows(table, ui);
+        const selectedRow = resolveSelectedTableRow(table, ui, filteredRows);
+        headerTitle = table.name;
+        headerText = selectedRow ? `Row ${selectedRow.rowId} is selected.` : "Select a row to inspect its values.";
+        body = selectedRow
+          ? `
+              <div class="inspector-stack">
+                ${renderInspectorCard("Row ID", String(selectedRow.rowId), true)}
+                ${renderInspectorCard("State", selectedRow.exists ? "Live" : "Deleted")}
+                ${table.columns.map((column, index) =>
+                  renderTableInspectorCard(table, column, selectedRow.values[index], selectedRow.rowId)
+                ).join("")}
+              </div>
+            `
+          : `<div class="inspector-empty">No row is selected. Choose a visible row from the table.</div>`;
+      } else if (state.view.type === "map") {
+        const ui = getMapUi(snapshot);
+        headerTitle = "Map Inspector";
+        headerText = `Cell (${ui.x}, ${ui.y}) across the composite stack. Hidden items stay inspectable even when not rendered.`;
+        body = renderMapInspector(snapshot, ui);
+      } else if (state.view.type === "layer") {
+        const layer = getRequiredLayer(snapshot, state.view.name);
+        const ui = getLayerUi(layer.name);
+        const x = clamp(ui.x, 0, Math.max(0, snapshot.width - 1));
+        const y = clamp(ui.y, 0, Math.max(0, snapshot.height - 1));
+        const details = describeLayerCell(layer, x, y);
+        headerTitle = layer.name;
+        headerText = `Cell (${x}, ${y}) in ${layer.kindLabel}.`;
+        body = `
+          <div class="inspector-stack">
+            ${renderInspectorCard("Coordinate", `${x}, ${y}`, true)}
+            ${details.map((detail) => renderInspectorCard(detail.label, formatDetailForInspector(detail), detail.mono)).join("")}
+          </div>
+        `;
+      } else if (state.view.type === "store") {
+        const store = getRequiredStore(snapshot, state.view.name);
+        const ui = getStoreUi(store.name);
+        const entries = ui.showEmpty ? store.entries : store.nonEmptyEntries;
+        const filtered = entries.filter((entry) => ui.rowIdFilter === "" || entry.rowId === Number(ui.rowIdFilter));
+        const selectedEntry = filtered.find((entry) => entry.rowId === ui.selectedRowId) || filtered[0] || null;
+        headerTitle = store.name;
+        headerText = selectedEntry ? `Path slot for row ${selectedEntry.rowId}.` : "Select a path slot to inspect.";
+        body = selectedEntry
+          ? `
+              <div class="inspector-stack">
+                ${renderInspectorCard("Row ID", String(selectedEntry.rowId), true)}
+                ${renderInspectorCard("Length", String(selectedEntry.length))}
+                ${renderInspectorCard("Current Step", String(selectedEntry.currentStep))}
+                ${renderInspectorCard("Status", selectedEntry.length > 0 ? "Active" : "Empty")}
+                ${renderInspectorCard("Start Cell", selectedEntry.steps.length ? formatPathStepText(selectedEntry.steps[0], snapshot.width) : "No path data", true)}
+                ${renderInspectorCard("Current Cell", selectedEntry.steps.length ? formatPathStepText(getCurrentPathStepValue(selectedEntry), snapshot.width) : "No path data", true)}
+                ${renderInspectorCard("Goal Cell", selectedEntry.steps.length ? formatPathStepText(selectedEntry.steps[selectedEntry.steps.length - 1], snapshot.width) : "No path data", true)}
+                <div class="detail-row">
+                  <span class="detail-label">Steps</span>
+                  <div class="detail-value">${renderPathStepList(selectedEntry, snapshot.width)}</div>
+                </div>
+              </div>
+            `
+          : `<div class="inspector-empty">No entry is selected. Choose a path slot from the table.</div>`;
+      }
+
+      inspectorPanel.innerHTML = `
+        <div class="inspector-header">
+          <h2>${escapeHtml(headerTitle)}</h2>
+          <p>${escapeHtml(headerText)}</p>
+        </div>
+        ${body}
+      `;
+    }
+
+    function renderSummaryView(snapshot) {
+      return `
+        <div data-summary-view="1">
+        <section class="view-header">
+          <div>
+            <h2>Snapshot Summary</h2>
+            <p>
+              Overview of the loaded DetMap database. Use the navigator to drill into tables,
+              layers, globals, and path stores. This inspector is read-only and preserves deleted row slots.
+            </p>
+          </div>
+        </section>
+
+        <section class="summary-grid" data-summary-grid="overview">
+          ${renderSummaryOverviewGrid(snapshot)}
+        </section>
+
+        ${state.timeline ? `
+          <section class="card" style="margin-top:16px;">
+            <div class="view-header" style="margin-bottom:10px;">
+              <div>
+                <h2 style="font-size:22px;">Timeline Session</h2>
+                <p>
+                  This snapshot is part of a loaded frame sequence. Use the transport controls above
+                  to step or play across frames while keeping the same table, layer, or store view open.
+                </p>
+              </div>
+            </div>
+            <div class="metric-grid" data-summary-grid="timeline">
+              ${renderSummaryTimelineGrid(snapshot)}
+            </div>
+          </section>
+        ` : ""}
+
+        <section class="card" style="margin-top:16px;">
+          <div class="view-header" style="margin-bottom:10px;">
+            <div>
+              <h2 style="font-size:22px;">Modeling Surface</h2>
+              <p>Read DetMap as a spatial database: tables for sparse rows, layers for dense cells, indexes for spatial lookup, stores for derived payloads such as active paths.</p>
+            </div>
+          </div>
+          <div class="metric-grid" data-summary-grid="modeling">
+            ${renderSummaryModelingGrid(snapshot)}
+          </div>
+        </section>
+        </div>
+      `;
+    }
+
+    function renderGlobalsView(snapshot) {
+      return `
+        <div data-globals-view="1">
+        <section class="view-header">
+          <div>
+            <h2>Globals</h2>
+            <p>Global Fix64 values stored on the root database. Raw values are preserved alongside formatted decimal text.</p>
+          </div>
+        </section>
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>Key</th>
+                <th>Display</th>
+                <th>Raw Value</th>
+              </tr>
+            </thead>
+            <tbody data-globals-body>
+              ${renderGlobalsRows(snapshot)}
+            </tbody>
+          </table>
+        </div>
+        </div>
+      `;
+    }
+
+    function renderFrameView(snapshot) {
+      if (!snapshot.frameRecord) {
+        return `
+          <section class="empty-state">
+            <div class="drop-target">
+              <h2>No Db Commands</h2>
+              <p>
+                This snapshot does not include persisted DB commands for the current frame.
+                Load a version 4 snapshot from the latest settlement demo output to inspect them.
+              </p>
+            </div>
+          </section>
+        `;
+      }
+
+      const frameRecord = snapshot.frameRecord;
+      const ui = getFrameUi();
+      const selectedCommand = resolveSelectedFrameCommand(frameRecord, ui);
+
+      return `
+        <div data-frame-view="1">
+        <section class="view-header">
+          <div>
+            <h2>Db Commands</h2>
+            <p>Low-level database mutations that produced this snapshot. Use this view to verify the exact writes applied to tables, layers, globals, and cell indices.</p>
+          </div>
+          <div class="pill-row">
+            <span class="pill" data-frame-stat="commands">${frameRecord.commandCount} commands</span>
+            <span class="pill" data-frame-stat="tables">${frameRecord.summary.changedTables.length} tables</span>
+            <span class="pill" data-frame-stat="layers">${frameRecord.summary.changedLayers.length} layers</span>
+            <span class="pill" data-frame-stat="indices">${frameRecord.summary.changedIndices.length} indices</span>
+          </div>
+        </section>
+
+        <section class="metric-grid" style="margin-bottom:16px;" data-frame-metrics>
+          ${renderFrameMetrics(frameRecord)}
+        </section>
+
+        <section class="card" style="margin-bottom:16px;" data-frame-detail>
+          ${renderFrameSummaryCard(frameRecord)}
+        </section>
+
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Kind</th>
+                <th>Target</th>
+                <th>Field</th>
+                <th>Row</th>
+                <th>Cell</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody data-frame-body>
+              ${renderFrameCommandRows(frameRecord.commands, selectedCommand)}
+            </tbody>
+          </table>
+        </div>
+        </div>
+      `;
+    }
+
+    function renderFrameMetrics(frameRecord) {
+      return `
+        ${metricCard("Frame Tick", formatBigInt(frameRecord.tick), "Tick recorded with the command list")}
+        ${metricCard("State Hash", formatShortStateHash(frameRecord.stateHashHex), "State after applying these commands")}
+        ${metricCard("Frame Hash", formatShortStateHash(frameRecord.frameHashHex), "Includes recorded tick")}
+        ${metricCard("Touched Rows", String(frameRecord.summary.touchedRows.length), "Rows referenced by this frame")}
+        ${metricCard("Touched Cells", String(frameRecord.summary.touchedCells.length), "Cells referenced by this frame")}
+      `;
+    }
+
+    function renderTableView(table) {
+      const ui = getTableUi(table.name);
+      const filteredRows = buildFilteredTableRows(table, ui);
+      const selectedRow = resolveSelectedTableRow(table, ui, filteredRows);
+      const pageCount = Math.max(1, Math.ceil(filteredRows.length / ui.pageSize));
+      ui.page = Math.min(ui.page, pageCount - 1);
+      const start = ui.page * ui.pageSize;
+      const pageRows = filteredRows.slice(start, start + ui.pageSize);
+
+      return `
+        <div data-table-view="${escapeAttr(table.name)}">
+        <section class="view-header">
+          <div>
+            <h2>${escapeHtml(table.name)}</h2>
+            <p>Row data first. Search, filter, and inspect directly from the table body without extra summary cards getting in the way.</p>
+          </div>
+        </section>
+
+        <section class="toolbar sticky-toolbar">
+          <div class="control wide">
+            <label for="tableSearch">Search visible values</label>
+            <input id="tableSearch" type="text" value="${escapeAttr(ui.search)}" placeholder="Search row text, ids, names, or numbers" />
+          </div>
+          <div class="control">
+            <label for="rowIdFilter">Row ID</label>
+            <input id="rowIdFilter" type="number" value="${ui.rowIdFilter === "" ? "" : escapeAttr(String(ui.rowIdFilter))}" placeholder="Optional exact row id" />
+          </div>
+          <div class="control">
+            <label for="pageSize">Page size</label>
+            <select id="pageSize">
+              ${[50, 100, 250, 500].map((size) => `<option value="${size}" ${size === ui.pageSize ? "selected" : ""}>${size}</option>`).join("")}
+            </select>
+          </div>
+          <div class="control">
+            <label class="toggle"><input id="hideDeleted" type="checkbox" ${ui.hideDeleted ? "checked" : ""} /> Hide deleted rows</label>
+          </div>
+          <div class="control">
+            <label>Page</label>
+            <div class="button-row">
+              <button class="button secondary" id="prevPage" ${ui.page === 0 ? "disabled" : ""}>Prev</button>
+              <button class="button secondary" id="nextPage" ${ui.page >= pageCount - 1 ? "disabled" : ""}>Next</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>Row ID</th>
+                <th>Exists</th>
+                ${table.columns.map((column) => renderTableHeaderCell(column)).join("")}
+              </tr>
+            </thead>
+            <tbody data-table-body>
+              ${renderTableBody(table, pageRows, selectedRow)}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="footer-note" data-table-footer>
+          ${renderTableFooter(filteredRows.length, start, pageRows.length, ui.page, pageCount, table)}
+        </div>
+        </div>
+      `;
+    }
+
+    function renderTableBody(table, pageRows, selectedRow) {
+      if (pageRows.length === 0) {
+        return `<tr><td colspan="${table.columns.length + 2}">No rows match the current filter.</td></tr>`;
+      }
+
+      return pageRows.map((row) => `
+        <tr data-table-row="${row.rowId}" class="${row.exists ? "" : "deleted"} ${selectedRow && selectedRow.rowId === row.rowId ? "selected-row" : ""}" style="cursor:pointer;">
+          <td class="mono">${row.rowId}</td>
+          <td>${row.exists ? `<span class="badge ok">Live</span>` : `<span class="badge warn">Deleted</span>`}</td>
+          ${row.values.map((value, index) => renderTableValueCell(value, table.columns[index])).join("")}
+        </tr>
+      `).join("");
+    }
+
+    function renderTableFooter(filteredCount, start, pageRowCount, page, pageCount, table = null) {
+      const statsText = table
+        ? ` Live ${table.existingCount} · Deleted ${table.highWater - table.existingCount} · Columns ${table.columns.length}.`
+        : "";
+      return `
+        Showing rows ${filteredCount === 0 ? 0 : start + 1}-${Math.min(start + pageRowCount, filteredCount)}
+        of ${filteredCount}. Page ${page + 1} / ${pageCount}.${statsText}
+      `;
+    }
+
+    function renderFrameSummaryCard(frameRecord) {
+      return `
+        <span class="metric-label">Change Summary</span>
+        <div class="pill-row">
+          ${renderSummaryPill("Globals", frameRecord.summary.changedGlobals)}
+          ${renderSummaryPill("Tables", frameRecord.summary.changedTables)}
+          ${renderSummaryPill("Columns", frameRecord.summary.changedColumns)}
+          ${renderSummaryPill("Layers", frameRecord.summary.changedLayers)}
+          ${renderSummaryPill("Indices", frameRecord.summary.changedIndices)}
+        </div>
+        <div class="footer-note">
+          Writes: globals ${frameRecord.summary.globalWriteCount}, create ${frameRecord.summary.createdRowCount},
+          delete ${frameRecord.summary.deletedRowCount}, columns ${frameRecord.summary.columnWriteCount},
+          layers ${frameRecord.summary.layerWriteCount}, indices ${frameRecord.summary.indexWriteCount}.
+        </div>
+      `;
+    }
+
+    function renderSummaryPill(label, values) {
+      if (!values || values.length === 0) {
+        return `<span class="pill">${escapeHtml(label)} • none</span>`;
+      }
+      return `<span class="pill">${escapeHtml(label)} • ${escapeHtml(values.join(", "))}</span>`;
+    }
+
+    function renderFrameCommandRows(commands, selectedCommand) {
+      if (!commands.length) {
+        return `<tr><td colspan="7">This frame recorded zero DB commands.</td></tr>`;
+      }
+
+      return commands.map((command) => `
+        <tr data-frame-command-row="${command.order}" class="${selectedCommand && selectedCommand.order === command.order ? "selected-row" : ""}" style="cursor:pointer;">
+          <td class="mono">${command.order}</td>
+          <td>${escapeHtml(command.kindLabel)}</td>
+          <td class="mono">${escapeHtml(command.targetName || "—")}</td>
+          <td class="mono">${escapeHtml(command.fieldName || "—")}</td>
+          <td class="mono">${formatFrameCommandRowId(command)}</td>
+          <td class="mono">${formatFrameCommandCell(command)}</td>
+          <td>${formatFrameCommandValue(command)}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderColumnSchemaPill(column) {
+      const classes = ["pill"];
+      if (column.isDerived) {
+        classes.push("derived-pill");
+      }
+
+      const parts = [`${escapeHtml(column.name)} : ${escapeHtml(column.kindLabel)}`];
+      if (column.isDerived) {
+        parts.push("Derived");
+      }
+      if (column.isDerived && column.source) {
+        parts.push(`Source ${escapeHtml(column.source)}`);
+      }
+
+      return `<span class="${classes.join(" ")}">${parts.join(" • ")}</span>`;
+    }
+
+    function renderTableHeaderCell(column) {
+      return `
+        <th class="${column.isDerived ? "derived-column" : ""}" title="${escapeAttr(getDerivedColumnMetaText(column))}">
+          <div class="column-header-cell">
+            <span class="column-header-title">${escapeHtml(column.name)}</span>
+            ${column.isDerived
+              ? `
+                <div class="column-header-meta">
+                  <span class="badge derived">Derived</span>
+                  ${column.isEditable ? "" : `<span class="badge locked">Read-only</span>`}
+                </div>
+              `
+              : ""
+            }
+          </div>
+        </th>
+      `;
+    }
+
+    function getDerivedColumnMetaText(column) {
+      if (!column.isDerived) {
+        return `${column.name} : ${column.kindLabel}`;
+      }
+
+      const parts = [`${column.name} : ${column.kindLabel}`, "Derived column"];
+      parts.push(column.isEditable ? "Editable" : "Read-only");
+      if (column.source) {
+        parts.push(`Source: ${column.source}`);
+      }
+      return parts.join(" • ");
+    }
+
+    function renderTableValueCell(value, column) {
+      const className = getTableValueCellClassName(value);
+      const classes = [];
+      if (className) {
+        classes.push(className);
+      }
+      if (column.isDerived) {
+        classes.push("derived-cell");
+      }
+      const classAttr = classes.length ? ` class="${classes.join(" ")}"` : "";
+      const titleAttr = column.isDerived
+        ? ` title="${escapeAttr(getDerivedColumnMetaText(column))}"`
+        : "";
+      return `<td${classAttr}${titleAttr}>${renderTableValueCellInner(value)}</td>`;
+    }
+
+    function renderTableValueCellInner(value) {
+      if (value.kind === "fix64") {
+        return `<div>${escapeHtml(value.primary)}</div><div class="mono">${escapeHtml(value.secondary)}</div>`;
+      }
+      if (value.kind === "null") {
+        return `<span class="mono">null</span>`;
+      }
+      return escapeHtml(value.primary);
+    }
+
+    function getTableValueCellClassName(value) {
+      if (value.kind === "mono") {
+        return "code";
+      }
+      return "";
+    }
+
+    function renderMapView(snapshot) {
+      const ui = getMapUi(snapshot);
+      const groups = buildMapLayerGroups(snapshot.layers);
+      const construction = getConstructionSnapshot(snapshot);
+      const visibleLayerCount = snapshot.layers.filter((layer) => ui.layerVisibility[layer.name]).length;
+      const visibleStoreCount = snapshot.stores.filter((store) => ui.storeVisibility[store.name]).length;
+      const activeConstructionLabel = construction.active
+        ? `${construction.active.name} ${construction.active.statusLabel} ${formatConstructionProgress(construction.active)}`
+        : "All construction complete";
+
+      return `
+        <div data-map-view="1">
+          <section class="view-header">
+            <div>
+              <h2>Composite Map</h2>
+              <p>Inspect one grid, toggle stacked layers, and keep cell data grouped while the timeline advances.</p>
+            </div>
+            <div class="pill-row">
+              <span class="pill" data-map-stat="grid">${snapshot.width} x ${snapshot.height}</span>
+              <span class="pill" data-map-stat="layers">${visibleLayerCount} visible layers</span>
+              <span class="pill" data-map-stat="stores">${visibleStoreCount} visible stores</span>
+              <span class="pill" data-map-stat="construction">${escapeHtml(activeConstructionLabel)}</span>
+              <span class="pill" data-map-stat="pending">${construction.pendingCount} pending sites</span>
+            </div>
+          </section>
+
+          <section class="map-layout">
+            <div class="preview-panel map-stage-panel">
+              <section class="toolbar map-stage-toolbar sticky-toolbar">
+                <div class="control">
+                  <label for="mapCoordX">X</label>
+                  <input id="mapCoordX" type="number" min="0" max="${snapshot.width - 1}" value="${ui.x}" />
+                </div>
+                <div class="control">
+                  <label for="mapCoordY">Y</label>
+                  <input id="mapCoordY" type="number" min="0" max="${snapshot.height - 1}" value="${ui.y}" />
+                </div>
+                <div class="pill-row" style="margin-top:0;">
+                  <span class="pill" data-map-cell-label>Cell (${ui.x}, ${ui.y})</span>
+                  <span class="pill warn">${escapeHtml(formatCellIndex(ui.x, ui.y, snapshot.width))}</span>
+                </div>
+              </section>
+
+              <div class="preview-canvas-wrap">
+                <canvas id="mapCanvas" width="${snapshot.width}" height="${snapshot.height}"></canvas>
+              </div>
+              <div class="footer-note">Click the map to inspect a cell. Toggle layers and path stores from the stack on the right.</div>
+            </div>
+
+            <div class="preview-panel">
+              <div class="map-stack-toolbar">
+                <button class="button secondary toolbar" id="mapShowAllButton">Show All</button>
+                <button class="button secondary toolbar" id="mapHideAllButton">Hide All</button>
+                <button class="button secondary toolbar" id="mapResetStackButton">Reset Stack</button>
+              </div>
+
+              <div class="map-layer-stack">
+                ${groups.map((group) => `
+                  <section class="map-stack-group">
+                    <div class="map-stack-group-title">${escapeHtml(group.title)}</div>
+                    ${group.items.map((layer) => renderMapLayerItem(layer, ui.layerVisibility[layer.name], "layer", layer.summaryText)).join("")}
+                  </section>
+                `).join("")}
+
+                ${snapshot.stores.length ? `
+                  <section class="map-stack-group">
+                    <div class="map-stack-group-title">Path Stores</div>
+                    ${snapshot.stores.map((store) =>
+                      renderMapLayerItem(store, ui.storeVisibility[store.name], "store", `${store.nonEmptyEntries.length} active paths`)
+                    ).join("")}
+                  </section>
+                ` : ""}
+
+                <section class="map-stack-group">
+                  <div class="map-stack-group-title">Derived Overlays</div>
+                  ${renderMapLayerItem(
+                    { name: "constructionOverlay", kindLabel: "Derived", summaryText: construction.active ? `${construction.active.name} | ${formatConstructionMaterials(construction.active)}` : "No active site" },
+                    ui.overlayVisibility.construction,
+                    "overlay",
+                    construction.active ? `${construction.active.name} | ${formatConstructionMaterials(construction.active)}` : "No active site"
+                  )}
+                </section>
+              </div>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderMapLayerItem(item, visible, itemType, metaText) {
+      const supportsTransparency = itemType === "layer" && supportsZeroTransparency(item);
+      const supportsRamp = itemType === "layer" && supportsLayerRampEditor(item);
+      const transparentZero = supportsTransparency && getMapUi().layerTransparency[item.name];
+      const ramp = supportsRamp ? getMapUi().layerColorRamp[item.name] : null;
+      return `
+        <div class="map-layer-item ${visible ? "" : "hidden"}" data-map-item-name="${escapeAttr(item.name)}" data-map-item-type="${itemType}">
+          <div class="map-layer-row">
+            <input class="map-layer-toggle" data-map-toggle="${itemType}" data-map-name="${escapeAttr(item.name)}" type="checkbox" ${visible ? "checked" : ""} />
+            <div>
+              <div class="map-layer-name">${escapeHtml(item.name)}</div>
+              <div class="map-layer-meta" data-map-meta>${escapeHtml(metaText)}</div>
+            </div>
+            <div class="map-layer-kind">
+              <span class="map-layer-visibility">${visible ? "Shown" : "Hidden"}</span>
+            </div>
+          </div>
+          <div class="map-inspector-meta-row">
+            <span class="pill">${escapeHtml(item.kindLabel)}</span>
+          </div>
+          ${supportsTransparency || supportsRamp ? `
+            <div class="map-layer-actions">
+              ${supportsRamp ? `
+                <label class="map-layer-ramp">
+                  <span class="map-layer-ramp-label">Min</span>
+                  <input class="map-layer-color" data-map-color="min" data-map-name="${escapeAttr(item.name)}" type="color" value="${escapeAttr(ramp.min)}" />
+                </label>
+                <label class="map-layer-ramp">
+                  <span class="map-layer-ramp-label">Max</span>
+                  <input class="map-layer-color" data-map-color="max" data-map-name="${escapeAttr(item.name)}" type="color" value="${escapeAttr(ramp.max)}" />
+                </label>
+              ` : ""}
+              <button
+                class="map-layer-transparency ${transparentZero ? "active" : ""}"
+                data-map-transparency="zero"
+                data-map-name="${escapeAttr(item.name)}"
+                type="button"
+              >${transparentZero ? "Zero Transparent" : "Opaque Zero"}</button>
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }
+
+    function renderMapInspector(snapshot, ui) {
+      const cellIndex = ui.y * snapshot.width + ui.x;
+      const constructionSection = renderConstructionInspector(snapshot, ui);
+      const layerSections = buildMapLayerGroups(snapshot.layers).map((group) => `
+        <section class="map-inspector-section">
+          <div class="map-inspector-section-title">${escapeHtml(group.title)}</div>
+          ${group.items.map((layer) => renderMapInspectorLayerItem(layer, ui.layerVisibility[layer.name], describeLayerCell(layer, ui.x, ui.y))).join("")}
+        </section>
+      `).join("");
+
+      const storeSection = snapshot.stores.length
+        ? `
+          <section class="map-inspector-section">
+            <div class="map-inspector-section-title">Path Stores</div>
+            ${snapshot.stores.map((store) => renderMapInspectorStoreItem(store, ui.storeVisibility[store.name], cellIndex, snapshot.width)).join("")}
+          </section>
+        `
+        : "";
+
+      return `
+        <div class="inspector-stack">
+          ${renderInspectorCard("Coordinate", `${ui.x}, ${ui.y}`, true)}
+          ${renderInspectorCard("Cell Index", formatCellIndex(ui.x, ui.y, snapshot.width), true)}
+          ${constructionSection}
+          <div class="map-inspector-group">
+            ${layerSections}
+            ${storeSection}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderConstructionInspector(snapshot, ui) {
+      const construction = getConstructionSnapshot(snapshot);
+      const cellBuilding = getBuildingRowForCell(snapshot, ui.x, ui.y);
+
+      const activeMarkup = construction.active
+        ? `
+          ${renderInspectorCard("Active Site", construction.active.name)}
+          ${renderInspectorCard("Status", construction.active.statusLabel)}
+          ${renderInspectorCard("Progress", formatConstructionProgress(construction.active), true)}
+          ${renderInspectorCard("Materials", formatConstructionMaterials(construction.active), true)}
+        `
+        : `${renderInspectorCard("Active Site", "All complete")}`;
+
+      const cellMarkup = cellBuilding
+        ? `
+          ${renderInspectorCard("Cell Building", cellBuilding.name)}
+          ${renderInspectorCard("Cell Status", cellBuilding.statusLabel)}
+          ${renderInspectorCard("Cell Progress", formatConstructionProgress(cellBuilding), true)}
+          ${renderInspectorCard("Cell Materials", formatConstructionMaterials(cellBuilding), true)}
+          ${renderInspectorCard("Population", `${cellBuilding.populationGranted}/${cellBuilding.populationCapacity}`, true)}
+        `
+        : `${renderInspectorCard("Cell Building", "None")}`;
+
+      return `
+        <div class="map-inspector-group">
+          <section class="map-inspector-section">
+            <div class="map-inspector-section-title">Construction</div>
+            <div class="map-inspector-item">
+              <div class="map-inspector-values">
+                <div class="map-inspector-value">
+                  <div class="map-inspector-value-label">Queue</div>
+                  <div class="detail-value">${construction.pendingCount} pending / ${construction.completeCount} complete</div>
+                </div>
+              </div>
+            </div>
+            <div class="map-inspector-item">
+              <div class="map-inspector-values">
+                ${activeMarkup}
+                ${cellMarkup}
+              </div>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderMapInspectorLayerItem(layer, visible, details) {
+      return `
+        <div class="map-inspector-item">
+          <div class="map-inspector-item-header">
+            <div class="map-inspector-item-title">${escapeHtml(layer.name)}</div>
+            <div class="map-inspector-meta-row">
+              <span class="pill">${escapeHtml(layer.kindLabel)}</span>
+              <span class="map-layer-visibility">${visible ? "Shown" : "Hidden"}</span>
+            </div>
+          </div>
+          <div class="map-inspector-values">
+            ${details.map((detail) => `
+              <div class="map-inspector-value">
+                <div class="map-inspector-value-label">${escapeHtml(detail.label)}</div>
+                <div class="detail-value ${detail.mono ? "mono" : ""}">${renderDetailValue(detail)}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderMapInspectorStoreItem(store, visible, cellIndex, width) {
+      const currentRows = [];
+      const traversingRows = [];
+      const goalRows = [];
+      for (const entry of store.nonEmptyEntries) {
+        const currentCell = getCurrentPathStepValue(entry);
+        if (currentCell === cellIndex) {
+          currentRows.push(entry.rowId);
+        }
+        const goalCell = entry.steps[entry.steps.length - 1];
+        if (goalCell === cellIndex) {
+          goalRows.push(entry.rowId);
+        }
+        if (entry.steps.includes(cellIndex)) {
+          traversingRows.push(entry.rowId);
+        }
+      }
+
+      return `
+        <div class="map-inspector-item">
+          <div class="map-inspector-item-header">
+            <div class="map-inspector-item-title">${escapeHtml(store.name)}</div>
+            <div class="map-inspector-meta-row">
+              <span class="pill">${escapeHtml(store.kindLabel)}</span>
+              <span class="map-layer-visibility">${visible ? "Shown" : "Hidden"}</span>
+            </div>
+          </div>
+          <div class="map-inspector-values">
+            <div class="map-inspector-value">
+              <div class="map-inspector-value-label">Current Rows</div>
+              <div class="detail-value mono">${formatRowIdList(currentRows)}</div>
+            </div>
+            <div class="map-inspector-value">
+              <div class="map-inspector-value-label">Goal Rows</div>
+              <div class="detail-value mono">${formatRowIdList(goalRows)}</div>
+            </div>
+            <div class="map-inspector-value">
+              <div class="map-inspector-value-label">Traversing Rows</div>
+              <div class="detail-value mono">${formatRowIdList(traversingRows)}</div>
+            </div>
+            <div class="map-inspector-value">
+              <div class="map-inspector-value-label">Cell</div>
+              <div class="detail-value mono">${escapeHtml(formatPathStepText(cellIndex, width))}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderLayerView(layer) {
+      const ui = getLayerUi(layer.name);
+      const x = clamp(ui.x, 0, Math.max(0, state.snapshot.width - 1));
+      const y = clamp(ui.y, 0, Math.max(0, state.snapshot.height - 1));
+      ui.x = x;
+      ui.y = y;
+      const detailRows = describeLayerCell(layer, x, y);
+
+      return `
+        <section class="view-header">
+          <div>
+            <h2>${escapeHtml(layer.name)}</h2>
+            <p>Coordinate-driven layer inspector with live preview. Click the preview canvas to inspect a cell.</p>
+          </div>
+          <div class="pill-row">
+            <span class="pill">${escapeHtml(layer.kindLabel)}</span>
+            <span class="pill">${state.snapshot.width} x ${state.snapshot.height}</span>
+            <span class="pill">${escapeHtml(layer.summaryText)}</span>
+          </div>
+        </section>
+
+        <section class="split">
+          <div class="preview-panel">
+            <div class="toolbar" style="margin-bottom:14px;">
+              <div class="control">
+                <label for="coordX">X</label>
+                <input id="coordX" type="number" min="0" max="${state.snapshot.width - 1}" value="${x}" />
+              </div>
+              <div class="control">
+                <label for="coordY">Y</label>
+                <input id="coordY" type="number" min="0" max="${state.snapshot.height - 1}" value="${y}" />
+              </div>
+            </div>
+            <div class="preview-canvas-wrap">
+              <canvas id="layerCanvas" width="${state.snapshot.width}" height="${state.snapshot.height}"></canvas>
+            </div>
+            <div class="footer-note">Click the preview to change the inspected coordinate.</div>
+          </div>
+          <div class="preview-panel">
+            <span class="metric-label">Cell (${x}, ${y})</span>
+            <div class="detail-list">
+              ${detailRows.map((row) => `
+                <div class="detail-row">
+                  <span class="detail-label">${escapeHtml(row.label)}</span>
+                  <div class="detail-value ${row.mono ? "mono" : ""}">${renderDetailValue(row)}</div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderDetailValue(row) {
+      if (row.kind === "rowIds") {
+        return row.items.length ? row.items.map((id) => `<span class="mono">${id}</span>`).join(", ") : "None";
+      }
+      if (row.kind === "tags") {
+        return row.items.length ? row.items.map((tag) => `<span class="pill">${escapeHtml(tag)}</span>`).join(" ") : "None";
+      }
+      if (row.kind === "stack") {
+        return `${escapeHtml(row.primary)}<br /><span class="${row.secondaryMono ? "mono" : ""}">${escapeHtml(row.secondary)}</span>`;
+      }
+      return escapeHtml(row.primary);
+    }
+
+    function getPathStepCoordinate(step, width) {
+      return { x: step % width, y: Math.floor(step / width) };
+    }
+
+    function formatPathStepText(step, width) {
+      const coord = getPathStepCoordinate(step, width);
+      return `${step} -> (${coord.x}, ${coord.y})`;
+    }
+
+    function getPathStepValue(entry, index) {
+      if (!entry || index < 0 || index >= entry.steps.length) {
+        return null;
+      }
+      return entry.steps[index];
+    }
+
+    function getCurrentPathStepValue(entry) {
+      if (!entry || entry.steps.length === 0) {
+        return null;
+      }
+      return getPathStepValue(entry, Math.min(entry.currentStep, entry.steps.length - 1));
+    }
+
+    function renderPathStepList(entry, width) {
+      if (!entry || entry.steps.length === 0) {
+        return "No path data";
+      }
+
+      const stepItems = Array.from(entry.steps, (step, index) => `
+        <div class="path-step-item ${index === entry.currentStep ? "current" : ""}">
+          <span class="path-step-index">${index}</span>
+          <span>${step}</span>
+          <span class="path-step-arrow">-></span>
+          <span>(${step % width}, ${Math.floor(step / width)})</span>
+        </div>
+      `).join("");
+
+      return `
+        <div class="path-step-list">
+          ${stepItems}
+        </div>
+      `;
+    }
+
+    function formatFrameCommandRowId(command) {
+      return needsFrameCommandRow(command) ? String(command.rowId) : "—";
+    }
+
+    function formatFrameCommandCell(command) {
+      return needsFrameCommandCell(command) ? `(${command.x}, ${command.y})` : "—";
+    }
+
+    function formatFrameCommandValue(command) {
+      if (command.kind === 0 || command.kind === 5 || command.kind === 10) {
+        return `<span class="mono">${escapeHtml(formatFix64(command.fix64RawValue))}</span><br /><span class="mono">${escapeHtml(formatBigInt(command.fix64RawValue))}</span>`;
+      }
+      if (command.kind === 3 || command.kind === 8) {
+        return `<span class="mono">${command.byteValue}</span>`;
+      }
+      if (command.kind === 4 || command.kind === 9) {
+        return `<span class="mono">${command.intValue}</span>`;
+      }
+      if (command.kind === 6) {
+        return `<span class="mono">${escapeHtml(command.stringValue === null ? "null" : command.stringValue)}</span>`;
+      }
+      if (command.kind === 7) {
+        return `<span class="mono">${command.boolValue}</span>`;
+      }
+      return "—";
+    }
+
+    function needsFrameCommandRow(command) {
+      return [1, 2, 3, 4, 5, 6, 11, 12, 13].includes(command.kind);
+    }
+
+    function needsFrameCommandCell(command) {
+      return [7, 8, 9, 10, 11, 12].includes(command.kind);
+    }
+
+    function renderStoreView(store) {
+      const ui = getStoreUi(store.name);
+      const entries = ui.showEmpty ? store.entries : store.nonEmptyEntries;
+      const filtered = entries.filter((entry) => ui.rowIdFilter === "" || entry.rowId === Number(ui.rowIdFilter));
+      const selectedEntry = filtered.find((entry) => entry.rowId === ui.selectedRowId) || filtered[0] || null;
+
+      return `
+        <div data-store-view="${escapeAttr(store.name)}">
+        <section class="view-header">
+          <div>
+            <h2>${escapeHtml(store.name)}</h2>
+            <p>Path store entries by row id. Empty slots can be hidden or shown depending on the debugging task.</p>
+          </div>
+          <div class="pill-row">
+            <span class="pill" data-store-stat="kind">${escapeHtml(store.kindLabel)}</span>
+            <span class="pill" data-store-stat="slots">${store.slotCount} slots</span>
+            <span class="pill" data-store-stat="active">${store.nonEmptyEntries.length} active paths</span>
+          </div>
+        </section>
+
+        <section class="split">
+          <div>
+            <section class="toolbar sticky-toolbar">
+              <div class="control">
+                <label class="toggle"><input id="showEmptyPaths" type="checkbox" ${ui.showEmpty ? "checked" : ""} /> Show empty slots</label>
+              </div>
+              <div class="control">
+                <label for="storeRowIdFilter">Row ID</label>
+                <input id="storeRowIdFilter" type="number" value="${ui.rowIdFilter === "" ? "" : escapeAttr(String(ui.rowIdFilter))}" placeholder="Optional exact row id" />
+              </div>
+            </section>
+            <div class="table-shell">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Row ID</th>
+                    <th>Length</th>
+                    <th>Current Step</th>
+                    <th>Current Cell</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody data-store-body>
+                  ${renderStoreRows(filtered, selectedEntry, state.snapshot.width)}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="preview-panel">
+            <span class="metric-label">Selected Entry</span>
+            <div data-store-detail>
+              ${renderStoreDetail(selectedEntry, state.snapshot.width)}
+            </div>
+          </div>
+        </section>
+        </div>
+      `;
+    }
+
+    function wireMainViewInteractions() {
+      if (!state.snapshot) {
+        return;
+      }
+
+      if (state.view.type === "map") {
+        const snapshot = state.snapshot;
+        const ui = getMapUi(snapshot);
+        bindInput("mapCoordX", (value) => {
+          const next = Number(value);
+          if (Number.isFinite(next)) {
+            ui.x = clamp(next, 0, Math.max(0, snapshot.width - 1));
+          }
+          refreshMapPresentation();
+        });
+        bindInput("mapCoordY", (value) => {
+          const next = Number(value);
+          if (Number.isFinite(next)) {
+            ui.y = clamp(next, 0, Math.max(0, snapshot.height - 1));
+          }
+          refreshMapPresentation();
+        });
+        bindClick("mapShowAllButton", () => {
+          snapshot.layers.forEach((layer) => { ui.layerVisibility[layer.name] = true; });
+          snapshot.stores.forEach((store) => { ui.storeVisibility[store.name] = true; });
+          ui.overlayVisibility.construction = true;
+          refreshMapPresentation();
+        });
+        bindClick("mapHideAllButton", () => {
+          snapshot.layers.forEach((layer) => { ui.layerVisibility[layer.name] = false; });
+          snapshot.stores.forEach((store) => { ui.storeVisibility[store.name] = false; });
+          ui.overlayVisibility.construction = false;
+          refreshMapPresentation();
+        });
+        bindClick("mapResetStackButton", () => {
+          resetMapUiForSnapshot(snapshot);
+          refreshMapPresentation();
+        });
+
+        mainPanel.querySelectorAll("[data-map-toggle]").forEach((input) => {
+          if (input.dataset.boundChange === "1") {
+            return;
+          }
+          input.dataset.boundChange = "1";
+          input.addEventListener("change", (event) => {
+            const target = event.target;
+            const name = target.dataset.mapName;
+            const itemType = target.dataset.mapToggle;
+            const checked = target.checked;
+            if (itemType === "layer") {
+              ui.layerVisibility[name] = checked;
+            } else if (itemType === "store") {
+              ui.storeVisibility[name] = checked;
+            } else if (itemType === "overlay") {
+              ui.overlayVisibility[name === "constructionOverlay" ? "construction" : name] = checked;
+            }
+            refreshMapPresentation();
+          });
+        });
+
+        mainPanel.querySelectorAll("[data-map-transparency]").forEach((button) => {
+          if (button.dataset.boundClick === "1") {
+            return;
+          }
+          button.dataset.boundClick = "1";
+          button.addEventListener("click", () => {
+            const name = button.dataset.mapName;
+            ui.layerTransparency[name] = !ui.layerTransparency[name];
+            refreshMapPresentation();
+          });
+        });
+
+        mainPanel.querySelectorAll("[data-map-color]").forEach((input) => {
+          if (input.dataset.boundInput === "1") {
+            return;
+          }
+          input.dataset.boundInput = "1";
+          input.addEventListener("input", () => {
+            const name = input.dataset.mapName;
+            const edge = input.dataset.mapColor;
+            const ramp = ui.layerColorRamp[name] || (ui.layerColorRamp[name] = getDefaultLayerRampHex(getRequiredLayer(snapshot, name)));
+            ramp[edge] = input.value;
+            refreshMapPresentation();
+          });
+        });
+
+        const canvas = document.getElementById("mapCanvas");
+        if (canvas) {
+          drawCompositeMapPreview(canvas, snapshot, ui);
+          canvas.addEventListener("click", (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = clamp(Math.floor((event.clientX - rect.left) * canvas.width / rect.width), 0, canvas.width - 1);
+            const y = clamp(Math.floor((event.clientY - rect.top) * canvas.height / rect.height), 0, canvas.height - 1);
+            ui.x = x;
+            ui.y = y;
+            refreshMapPresentation();
+          });
+        }
+      }
+
+      if (state.view.type === "table") {
+        const table = getRequiredTable(state.snapshot, state.view.name);
+        const ui = getTableUi(table.name);
+        bindInput("tableSearch", (value) => { ui.search = value; ui.page = 0; render(); });
+        bindInput("rowIdFilter", (value) => { ui.rowIdFilter = value.trim() === "" ? "" : value; ui.page = 0; render(); });
+        bindInput("pageSize", (value) => { ui.pageSize = Number(value); ui.page = 0; render(); });
+        bindCheck("hideDeleted", (checked) => { ui.hideDeleted = checked; ui.page = 0; render(); });
+        bindClick("prevPage", () => { ui.page = Math.max(0, ui.page - 1); render(); });
+        bindClick("nextPage", () => { ui.page = Math.min(ui.page + 1, Math.max(0, Math.ceil(buildFilteredTableRows(table, ui).length / ui.pageSize) - 1)); render(); });
+        bindTableRowSelection(table.name);
+      }
+
+      if (state.view.type === "frame") {
+        bindFrameCommandSelection();
+      }
+
+      if (state.view.type === "layer") {
+        const layer = getRequiredLayer(state.snapshot, state.view.name);
+        const ui = getLayerUi(layer.name);
+        bindInput("coordX", (value) => { ui.x = Number(value); render(); });
+        bindInput("coordY", (value) => { ui.y = Number(value); render(); });
+
+        const canvas = document.getElementById("layerCanvas");
+        if (canvas) {
+          drawLayerPreview(canvas, layer, clamp(ui.x, 0, canvas.width - 1), clamp(ui.y, 0, canvas.height - 1));
+          canvas.addEventListener("click", (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = clamp(Math.floor((event.clientX - rect.left) * canvas.width / rect.width), 0, canvas.width - 1);
+            const y = clamp(Math.floor((event.clientY - rect.top) * canvas.height / rect.height), 0, canvas.height - 1);
+            ui.x = x;
+            ui.y = y;
+            render();
+          });
+        }
+      }
+
+      if (state.view.type === "store") {
+        const store = getRequiredStore(state.snapshot, state.view.name);
+        const ui = getStoreUi(store.name);
+        bindCheck("showEmptyPaths", (checked) => { ui.showEmpty = checked; render(); });
+        bindInput("storeRowIdFilter", (value) => { ui.rowIdFilter = value.trim() === "" ? "" : value; render(); });
+        bindStoreRowSelection(store.name);
+      }
+    }
+
+    function bindTableRowSelection(tableName) {
+      const ui = getTableUi(tableName);
+      mainPanel.querySelectorAll("[data-table-row]").forEach((row) => {
+        if (row.dataset.boundClick === "1") {
+          return;
+        }
+        row.dataset.boundClick = "1";
+        row.addEventListener("click", () => {
+          ui.selectedRowId = Number(row.dataset.tableRow);
+          refreshTablePresentation();
+        });
+      });
+    }
+
+    function bindStoreRowSelection(storeName) {
+      const ui = getStoreUi(storeName);
+      mainPanel.querySelectorAll("[data-store-row]").forEach((row) => {
+        if (row.dataset.boundClick === "1") {
+          return;
+        }
+        row.dataset.boundClick = "1";
+        row.addEventListener("click", () => {
+          ui.selectedRowId = Number(row.dataset.storeRow);
+          render();
+        });
+      });
+    }
+
+    function bindFrameCommandSelection() {
+      const ui = getFrameUi();
+      mainPanel.querySelectorAll("[data-frame-command-row]").forEach((row) => {
+        if (row.dataset.boundClick === "1") {
+          return;
+        }
+        row.dataset.boundClick = "1";
+        row.addEventListener("click", () => {
+          ui.selectedOrder = Number(row.dataset.frameCommandRow);
+          render();
+        });
+      });
+    }
+
+    function wireTimelineInteractions() {
+      if (!state.timeline) {
+        return;
+      }
+
+      bindClick("timelinePlayPauseButton", () => {
+        state.timeline.isPlaying = !state.timeline.isPlaying;
+        syncTimelinePlayback();
+        renderTimelinePanel();
+      });
+      bindClick("timelinePrevButton", () => {
+        setTimelineFrame(state.timeline.currentIndex - 1);
+      });
+      bindClick("timelineNextButton", () => {
+        setTimelineFrame(state.timeline.currentIndex + 1);
+      });
+      bindInput("timelineRange", (value) => {
+        setTimelineFrame(Number(value));
+      });
+      bindInput("timelineSpeed", (value) => {
+        state.timeline.playbackMs = Number(value);
+        syncTimelinePlayback();
+      });
+      bindCheck("timelineLoop", (checked) => {
+        state.timeline.loop = checked;
+      });
+    }
+
+    function bindInput(id, handler) {
+      const element = document.getElementById(id);
+      if (element) {
+        element.addEventListener("input", (event) => handler(event.target.value));
+        element.addEventListener("change", (event) => handler(event.target.value));
+      }
+    }
+
+    function bindCheck(id, handler) {
+      const element = document.getElementById(id);
+      if (element) {
+        element.addEventListener("change", (event) => handler(event.target.checked));
+      }
+    }
+
+    function bindClick(id, handler) {
+      const element = document.getElementById(id);
+      if (element) {
+        element.addEventListener("click", handler);
+      }
+    }
+
+    function parseSnapshot(buffer, fileName) {
+      const reader = new BinaryCursor(buffer);
+      const magic = String.fromCharCode(reader.readByte(), reader.readByte(), reader.readByte(), reader.readByte());
+      if (magic !== "DMAP") {
+        throw new Error("Invalid magic. Expected DMAP.");
+      }
+
+      const version = reader.readUInt16();
+      if (version !== 2 && version !== 3 && version !== 4 && version !== 5) {
+        throw new Error(`Unsupported snapshot version: ${version}. This inspector supports versions 2, 3, 4, and 5.`);
+      }
+
+      const width = reader.readInt32();
+      const height = reader.readInt32();
+      const cellCount = width * height;
+
+      const layerCount = reader.readInt32();
+      const layerSchemas = [];
+      for (let i = 0; i < layerCount; i++) {
+        const kind = reader.readByte();
+        const name = reader.readString();
+        layerSchemas.push({ kind, kindLabel: layerKindNames[kind] || `Unknown(${kind})`, name });
+      }
+
+      const tableCount = reader.readInt32();
+      const tableSchemas = [];
+      for (let i = 0; i < tableCount; i++) {
+        const name = reader.readString();
+        const columnCount = reader.readInt32();
+        const columns = [];
+        for (let j = 0; j < columnCount; j++) {
+          const kind = reader.readByte();
+          const columnName = reader.readString();
+          const isDerived = version >= 3 ? reader.readBoolean() : false;
+          const isEditable = version >= 3 ? reader.readBoolean() : true;
+          const source = version >= 3 ? reader.readString() : "";
+          columns.push({
+            name: columnName,
+            kind,
+            kindLabel: columnKindNames[kind] || `Unknown(${kind})`,
+            isDerived,
+            isEditable,
+            source,
+          });
+        }
+        const indexCount = version >= 5 ? reader.readInt32() : 0;
+        const indexes = [];
+        for (let j = 0; j < indexCount; j++) {
+          const kind = reader.readByte();
+          const indexName = reader.readString();
+          const columnName = reader.readString();
+          indexes.push({
+            name: indexName,
+            kind,
+            kindLabel: columnKindNames[kind] || `Unknown(${kind})`,
+            columnName,
+          });
+        }
+        tableSchemas.push({ name, columns, indexes });
+      }
+
+      const globalCount = reader.readInt32();
+      const globalKeys = [];
+      for (let i = 0; i < globalCount; i++) {
+        globalKeys.push(reader.readString());
+      }
+
+      const storeCount = reader.readInt32();
+      const storeNames = [];
+      for (let i = 0; i < storeCount; i++) {
+        storeNames.push(reader.readString());
+      }
+
+      const tickOffset = reader.offset;
+      const tick = reader.readUInt64();
+
+      const layers = layerSchemas.map((schema) => parseLayer(reader, schema, width, height, cellCount));
+      const globals = globalKeys.map((key) => {
+        const rawValue = reader.readInt64();
+        return { key, rawValue, displayValue: formatFix64(rawValue) };
+      });
+      const tables = tableSchemas.map((schema) => parseTable(reader, schema));
+      const stores = storeNames.map((name) => parsePathStore(reader, name));
+      const stateEndOffset = reader.offset;
+      const frameRecord = version >= 4 && reader.readBoolean() ? parseFrameRecord(reader) : null;
+
+      if (!reader.isAtEnd()) {
+        console.warn("Unread snapshot bytes remain:", reader.remainingBytes());
+      }
+
+      return {
+        fileName,
+        byteLength: buffer.byteLength,
+        version,
+        tick,
+        tickOffset,
+        stateEndOffset,
+        stateHashHex: null,
+        stateMatchesPrevious: false,
+        width,
+        height,
+        globals,
+        layers,
+        tables,
+        stores,
+        frameRecord,
+      };
+    }
+
+    function parseLayer(reader, schema, width, height, cellCount) {
+      switch (schema.kind) {
+        case 0:
+          return parseValueByteLayer(reader, schema, width, height, cellCount);
+        case 1:
+          return parseValueIntLayer(reader, schema, width, height, cellCount);
+        case 2:
+          return parseValueFix64Layer(reader, schema, width, height, cellCount);
+        case 3:
+          return parseBitLayer(reader, schema, width, height, cellCount);
+        case 4:
+          return parseCellIndexLayer(reader, schema, width, height, cellCount);
+        case 5:
+          return parseTagLayer(reader, schema, width, height, cellCount);
+        case 6:
+          return parseFlowLayer(reader, schema, width, height, cellCount);
+        default:
+          throw new Error(`Unsupported layer kind: ${schema.kind}`);
+      }
+    }
+
+    function parseValueByteLayer(reader, schema, width, height, cellCount) {
+      const byteLength = reader.readInt32();
+      const values = reader.readUint8Array(byteLength);
+      const stats = summarizeByteArray(values, cellCount);
+      return {
+        ...schema,
+        width,
+        height,
+        values,
+        stats,
+        summaryText: `min ${stats.min}, max ${stats.max}, ${stats.nonZero} non-zero`,
+      };
+    }
+
+    function parseValueIntLayer(reader, schema, width, height, cellCount) {
+      const byteLength = reader.readInt32();
+      const values = reader.readInt32Array(byteLength / 4);
+      const stats = summarizeIntArray(values, cellCount);
+      return {
+        ...schema,
+        width,
+        height,
+        values,
+        stats,
+        summaryText: `min ${stats.min}, max ${stats.max}`,
+      };
+    }
+
+    function parseValueFix64Layer(reader, schema, width, height, cellCount) {
+      const byteLength = reader.readInt32();
+      const values = reader.readInt64Array(byteLength / 8);
+      const stats = summarizeFix64Array(values, cellCount);
+      return {
+        ...schema,
+        width,
+        height,
+        values,
+        stats,
+        summaryText: `min ${formatFix64(stats.min)}, max ${formatFix64(stats.max)}`,
+      };
+    }
+
+    function parseBitLayer(reader, schema, width, height, cellCount) {
+      const wordCount = reader.readInt32();
+      const words = reader.readUInt64Array(wordCount);
+      let trueCount = 0;
+      for (let i = 0; i < cellCount; i++) {
+        if (readBit(words, i)) {
+          trueCount++;
+        }
+      }
+      return {
+        ...schema,
+        width,
+        height,
+        words,
+        trueCount,
+        summaryText: `${trueCount} true, ${cellCount - trueCount} false`,
+      };
+    }
+
+    function parseCellIndexLayer(reader, schema, width, height, cellCount) {
+      const headCount = reader.readInt32();
+      const heads = new Map();
+      for (let i = 0; i < headCount; i++) {
+        heads.set(reader.readInt32(), reader.readInt32());
+      }
+      const len = reader.readInt32();
+      const cellOf = reader.readInt32Array(len);
+      const next = reader.readInt32Array(len);
+      const cellCounts = new Uint16Array(cellCount);
+      let placedRows = 0;
+      for (let rowId = 0; rowId < cellOf.length; rowId++) {
+        const cell = cellOf[rowId];
+        if (cell >= 0 && cell < cellCount) {
+          placedRows++;
+          cellCounts[cell] += 1;
+        }
+      }
+      const maxCellCount = findArrayMax(cellCounts) || 0;
+      return {
+        ...schema,
+        width,
+        height,
+        heads,
+        cellOf,
+        next,
+        cellCounts,
+        maxCellCount,
+        placedRows,
+        summaryText: `${placedRows} placed rows, ${heads.size} populated cells`,
+      };
+    }
+
+    function parseTagLayer(reader, schema, width, height, cellCount) {
+      const entryCount = reader.readInt32();
+      const tagsByCell = new Map();
+      const tagCounts = new Uint16Array(cellCount);
+      let totalTags = 0;
+      for (let i = 0; i < entryCount; i++) {
+        const cell = reader.readInt32();
+        const tagCount = reader.readInt32();
+        const tags = [];
+        for (let j = 0; j < tagCount; j++) {
+          tags.push(reader.readString());
+        }
+        tagsByCell.set(cell, tags);
+        tagCounts[cell] = tagCount;
+        totalTags += tagCount;
+      }
+      const maxTagCount = findArrayMax(tagCounts) || 0;
+      return {
+        ...schema,
+        width,
+        height,
+        tagsByCell,
+        tagCounts,
+        maxTagCount,
+        totalTags,
+        summaryText: `${tagsByCell.size} populated cells, ${totalTags} tags`,
+      };
+    }
+
+    function parseFlowLayer(reader, schema, width, height, cellCount) {
+      const len = reader.readInt32();
+      const directions = reader.readUint8Array(len);
+      const costs = reader.readInt64Array(len);
+      let blockedCount = 0;
+      let minCost = LONG_MAX;
+      let maxCost = -LONG_MAX;
+      for (let i = 0; i < len; i++) {
+        if (directions[i] === 255) {
+          blockedCount++;
+          continue;
+        }
+        const value = costs[i];
+        if (value < minCost) minCost = value;
+        if (value > maxCost) maxCost = value;
+      }
+      return {
+        ...schema,
+        width,
+        height,
+        directions,
+        costs,
+        blockedCount,
+        minCost: minCost === LONG_MAX ? 0n : minCost,
+        maxCost: maxCost === -LONG_MAX ? 0n : maxCost,
+        summaryText: `${blockedCount} blocked, ${len - blockedCount} active`,
+      };
+    }
+
+    function parseTable(reader, schema) {
+      const highWater = reader.readInt32();
+      const freeCount = reader.readInt32();
+      const freeRowIds = [];
+      for (let i = 0; i < freeCount; i++) {
+        freeRowIds.push(reader.readInt32());
+      }
+
+      const alive = parseByteColumnData(reader);
+      const columns = schema.columns.map((column) => ({
+        ...column,
+        data: parseColumnData(reader, column.kind),
+      }));
+
+      let existingCount = 0;
+      for (let rowId = 0; rowId < highWater && rowId < alive.length; rowId++) {
+        if (alive[rowId] === 1) {
+          existingCount++;
+        }
+      }
+
+      return {
+        ...schema,
+        highWater,
+        freeRowIds,
+        alive,
+        columns,
+        existingCount,
+        derivedColumnCount: columns.filter((column) => column.isDerived).length,
+      };
+    }
+
+    function parseColumnData(reader, kind) {
+      switch (kind) {
+        case 0:
+          return parseByteColumnData(reader);
+        case 1:
+          return parseIntColumnData(reader);
+        case 2:
+          return parseFix64ColumnData(reader);
+        case 3:
+          return parseStringColumnData(reader);
+        default:
+          throw new Error(`Unsupported column kind: ${kind}`);
+      }
+    }
+
+    function parseByteColumnData(reader) {
+      const len = reader.readInt32();
+      return reader.readUint8Array(len);
+    }
+
+    function parseIntColumnData(reader) {
+      const len = reader.readInt32();
+      return reader.readInt32Array(len);
+    }
+
+    function parseFix64ColumnData(reader) {
+      const len = reader.readInt32();
+      return reader.readInt64Array(len);
+    }
+
+    function parseStringColumnData(reader) {
+      const len = reader.readInt32();
+      const values = new Array(len);
+      for (let i = 0; i < len; i++) {
+        const hasValue = reader.readBoolean();
+        values[i] = hasValue ? reader.readString() : null;
+      }
+      return values;
+    }
+
+    function parsePathStore(reader, name) {
+      const slotCount = reader.readInt32();
+      const entries = [];
+      const nonEmptyEntries = [];
+      for (let rowId = 0; rowId < slotCount; rowId++) {
+        const length = reader.readInt32();
+        let currentStep = 0;
+        let steps = [];
+        if (length > 0) {
+          currentStep = reader.readInt32();
+          steps = reader.readInt32Array(length);
+        }
+        const entry = { rowId, length, currentStep, steps };
+        entries.push(entry);
+        if (length > 0) {
+          nonEmptyEntries.push(entry);
+        }
+      }
+      return {
+        name,
+        kind: "Path",
+        kindLabel: "PathStore",
+        slotCount,
+        entries,
+        nonEmptyEntries,
+      };
+    }
+
+    function parseFrameRecord(reader) {
+      const tick = reader.readUInt64();
+      const stateHashHex = reader.readString();
+      const frameHashHex = reader.readString();
+      const commandCount = reader.readInt32();
+      const summary = parseFrameSummary(reader);
+      const recordCount = reader.readInt32();
+      const commands = [];
+      for (let i = 0; i < recordCount; i++) {
+        commands.push(parseDbCommandRecord(reader));
+      }
+
+      return {
+        tick,
+        stateHashHex,
+        frameHashHex,
+        commandCount,
+        summary,
+        commands,
+      };
+    }
+
+    function parseFrameSummary(reader) {
+      return {
+        globalWriteCount: reader.readInt32(),
+        createdRowCount: reader.readInt32(),
+        deletedRowCount: reader.readInt32(),
+        columnWriteCount: reader.readInt32(),
+        layerWriteCount: reader.readInt32(),
+        indexWriteCount: reader.readInt32(),
+        changedGlobals: readStringList(reader),
+        changedTables: readStringList(reader),
+        changedColumns: readStringList(reader),
+        changedLayers: readStringList(reader),
+        changedIndices: readStringList(reader),
+        touchedRows: readStringList(reader),
+        touchedCells: readStringList(reader),
+      };
+    }
+
+    function parseDbCommandRecord(reader) {
+      const order = reader.readInt32();
+      const kind = reader.readByte();
+      const targetName = reader.readString();
+      const fieldName = reader.readString();
+      const rowId = reader.readInt32();
+      const x = reader.readInt32();
+      const y = reader.readInt32();
+      const boolValue = reader.readBoolean();
+      const byteValue = reader.readByte();
+      const intValue = reader.readInt32();
+      const fix64RawValue = reader.readInt64();
+      const hasStringValue = reader.readBoolean();
+      const stringValue = hasStringValue ? reader.readString() : null;
+      return {
+        order,
+        kind,
+        kindLabel: dbCommandKindNames[kind] || `Unknown(${kind})`,
+        targetName,
+        fieldName,
+        rowId,
+        x,
+        y,
+        boolValue,
+        byteValue,
+        intValue,
+        fix64RawValue,
+        stringValue,
+      };
+    }
+
+    function readStringList(reader) {
+      const count = reader.readInt32();
+      const values = [];
+      for (let i = 0; i < count; i++) {
+        values.push(reader.readString());
+      }
+      return values;
+    }
+
+    function buildFilteredTableRows(table, ui) {
+      const rows = [];
+      const search = ui.search.trim().toLowerCase();
+      const exactRowId = ui.rowIdFilter === "" ? null : Number(ui.rowIdFilter);
+
+      for (let rowId = 0; rowId < table.highWater; rowId++) {
+        const exists = table.alive[rowId] === 1;
+        if (ui.hideDeleted && !exists) {
+          continue;
+        }
+        if (exactRowId !== null && rowId !== exactRowId) {
+          continue;
+        }
+
+        const values = table.columns.map((column) => describeColumnValue(column, rowId));
+        const haystack = [String(rowId), exists ? "live" : "deleted", ...values.map((value) => value.text)].join(" ").toLowerCase();
+        if (search && !haystack.includes(search)) {
+          continue;
+        }
+
+        rows.push({ rowId, exists, values });
+      }
+
+      return rows;
+    }
+
+    function describeColumnValue(column, rowId) {
+      const value = column.data[rowId];
+      if (column.kind === 0 || column.kind === 1) {
+        const text = String(value ?? 0);
+        return {
+          text,
+          kind: "mono",
+          primary: text,
+          isDerived: Boolean(column.isDerived),
+          source: column.source || "",
+          isEditable: column.isEditable !== false,
+        };
+      }
+      if (column.kind === 2) {
+        const raw = value ?? 0n;
+        return {
+          text: `${formatFix64(raw)} ${raw}`,
+          kind: "fix64",
+          primary: formatFix64(raw),
+          secondary: formatBigInt(raw),
+          isDerived: Boolean(column.isDerived),
+          source: column.source || "",
+          isEditable: column.isEditable !== false,
+        };
+      }
+      if (value == null) {
+        return {
+          text: "null",
+          kind: "null",
+          primary: "null",
+          isDerived: Boolean(column.isDerived),
+          source: column.source || "",
+          isEditable: column.isEditable !== false,
+        };
+      }
+      return {
+        text: String(value),
+        kind: "text",
+        primary: String(value),
+        isDerived: Boolean(column.isDerived),
+        source: column.source || "",
+        isEditable: column.isEditable !== false,
+      };
+    }
+
+    function describeLayerCell(layer, x, y) {
+      const cellIndex = y * layer.width + x;
+      if (layer.kind === 0 || layer.kind === 1) {
+        const value = layer.values[cellIndex] ?? 0;
+        return [
+          { label: "Value", kind: "mono", primary: String(value), mono: true },
+          { label: "Cell Index", kind: "mono", primary: String(cellIndex), mono: true },
+        ];
+      }
+      if (layer.kind === 2) {
+        const raw = layer.values[cellIndex] ?? 0n;
+        return [
+          { label: "Display", kind: "text", primary: formatFix64(raw), mono: false },
+          { label: "Raw Fix64", kind: "mono", primary: formatBigInt(raw), mono: true },
+          { label: "Cell Index", kind: "mono", primary: String(cellIndex), mono: true },
+        ];
+      }
+      if (layer.kind === 3) {
+        return [
+          { label: "Bit Value", kind: "mono", primary: String(readBit(layer.words, cellIndex)), mono: true },
+          { label: "Cell Index", kind: "mono", primary: String(cellIndex), mono: true },
+        ];
+      }
+      if (layer.kind === 4) {
+        const rowIds = getCellIndexRowIds(layer, cellIndex);
+        return [
+          { label: "Count", kind: "mono", primary: String(layer.cellCounts[cellIndex] || 0), mono: true },
+          { label: "Row IDs", kind: "rowIds", items: rowIds, mono: false },
+          { label: "Cell Index", kind: "mono", primary: String(cellIndex), mono: true },
+        ];
+      }
+      if (layer.kind === 5) {
+        const tags = layer.tagsByCell.get(cellIndex) || [];
+        return [
+          { label: "Tag Count", kind: "mono", primary: String(tags.length), mono: true },
+          { label: "Tags", kind: "tags", items: tags, mono: false },
+          { label: "Cell Index", kind: "mono", primary: String(cellIndex), mono: true },
+        ];
+      }
+      if (layer.kind === 6) {
+        const direction = layer.directions[cellIndex];
+        const cost = layer.costs[cellIndex] ?? 0n;
+        return [
+          { label: "Direction", kind: "text", primary: directionNames[direction] || `Unknown (${direction})`, mono: false },
+          { label: "Direction Raw", kind: "mono", primary: String(direction), mono: true },
+          {
+            label: "Cost",
+            kind: "stack",
+            primary: cost === LONG_MAX ? "Infinity sentinel" : formatFix64(cost),
+            secondary: formatBigInt(cost),
+            secondaryMono: true,
+            mono: false,
+          },
+          { label: "Cell Index", kind: "mono", primary: String(cellIndex), mono: true },
+        ];
+      }
+      return [{ label: "Unsupported", kind: "text", primary: "Layer kind not implemented.", mono: false }];
+    }
+
+    function drawLayerPreview(canvas, layer, selectedX, selectedY) {
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.createImageData(layer.width, layer.height);
+      const data = imageData.data;
+
+      for (let y = 0; y < layer.height; y++) {
+        for (let x = 0; x < layer.width; x++) {
+          const index = y * layer.width + x;
+          const color = getLayerColor(layer, index);
+          const pixelIndex = index * 4;
+          data[pixelIndex + 0] = color[0];
+          data[pixelIndex + 1] = color[1];
+          data[pixelIndex + 2] = color[2];
+          data[pixelIndex + 3] = 255;
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      ctx.save();
+      ctx.strokeStyle = "#db6a56";
+      ctx.lineWidth = Math.max(1, 2 / Math.max(canvas.width, canvas.height));
+      ctx.strokeRect(selectedX + 0.05, selectedY + 0.05, 0.9, 0.9);
+      ctx.restore();
+    }
+
+    function drawCompositeMapPreview(canvas, snapshot, ui) {
+      const ctx = canvas.getContext("2d");
+      const imageData = ctx.createImageData(snapshot.width, snapshot.height);
+      const data = imageData.data;
+      const baseLayers = snapshot.layers.filter((layer) => ui.layerVisibility[layer.name] && layer.kind !== 4);
+
+      for (let y = 0; y < snapshot.height; y++) {
+        for (let x = 0; x < snapshot.width; x++) {
+          const cellIndex = y * snapshot.width + x;
+          const pixelIndex = cellIndex * 4;
+          data[pixelIndex + 0] = 244;
+          data[pixelIndex + 1] = 248;
+          data[pixelIndex + 2] = 251;
+          data[pixelIndex + 3] = 255;
+
+          for (const layer of baseLayers) {
+            const sample = getCompositeLayerSample(layer, cellIndex, {
+              transparentZero: ui.layerTransparency[layer.name],
+              ramp: ui.layerColorRamp[layer.name],
+            });
+            if (!sample) {
+              continue;
+            }
+            blendPixel(data, pixelIndex, sample.color, sample.alpha);
+          }
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      ctx.save();
+      drawCompositeCellIndexOverlays(ctx, snapshot, ui);
+      drawCompositePathOverlays(ctx, snapshot, ui);
+      drawCompositeConstructionOverlays(ctx, snapshot, ui);
+      drawCompositeSelection(ctx, ui.x, ui.y, snapshot.width, snapshot.height);
+      ctx.restore();
+    }
+
+    function drawCompositeConstructionOverlays(ctx, snapshot, ui) {
+      if (!ui.overlayVisibility.construction) {
+        return;
+      }
+
+      const construction = getConstructionSnapshot(snapshot);
+      if (!construction.rows.length) {
+        return;
+      }
+
+      const placementLayer = getOptionalLayer(snapshot, "placementId");
+      if (construction.active && placementLayer && (placementLayer.kind === 1 || placementLayer.kind === 2 || placementLayer.kind === 0)) {
+        const activeRowId = construction.active.rowId;
+        for (let cellIndex = 0; cellIndex < placementLayer.values.length; cellIndex++) {
+          if (Number(placementLayer.values[cellIndex]) !== activeRowId) {
+            continue;
+          }
+          const x = cellIndex % snapshot.width;
+          const y = Math.floor(cellIndex / snapshot.width);
+          ctx.fillStyle = "rgba(199, 134, 70, 0.28)";
+          ctx.fillRect(x + 0.04, y + 0.04, 0.92, 0.92);
+        }
+      }
+
+      for (const row of construction.rows) {
+        const isActive = construction.active && construction.active.rowId === row.rowId;
+        const color = row.isComplete
+          ? "rgba(40, 200, 64, 0.82)"
+          : isActive
+            ? "rgba(199, 134, 70, 0.96)"
+            : "rgba(10, 132, 255, 0.82)";
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(0.06, 1.6 / Math.max(snapshot.width, snapshot.height));
+        ctx.strokeRect(row.anchorX + 0.12, row.anchorY + 0.12, 0.76, 0.76);
+        ctx.fillStyle = color;
+        ctx.fillRect(row.accessX + 0.24, row.accessY + 0.24, 0.52, 0.52);
+      }
+    }
+
+    function drawCompositeCellIndexOverlays(ctx, snapshot, ui) {
+      const indexLayers = snapshot.layers.filter((layer) => layer.kind === 4 && ui.layerVisibility[layer.name]);
+      for (const layer of indexLayers) {
+        const [r, g, b] = getNameColor(layer.name, 0.82);
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.72)`;
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.95)`;
+        ctx.lineWidth = Math.max(0.04, 1 / Math.max(snapshot.width, snapshot.height));
+        layer.heads.forEach((rowId, cellIndex) => {
+          const x = cellIndex % snapshot.width;
+          const y = Math.floor(cellIndex / snapshot.width);
+          ctx.fillRect(x + 0.16, y + 0.16, 0.68, 0.68);
+          if ((layer.cellCounts[cellIndex] || 0) > 1) {
+            ctx.strokeRect(x + 0.08, y + 0.08, 0.84, 0.84);
+          }
+        });
+      }
+    }
+
+    function drawCompositePathOverlays(ctx, snapshot, ui) {
+      const visibleStores = snapshot.stores.filter((store) => ui.storeVisibility[store.name]);
+      for (const store of visibleStores) {
+        const [r, g, b] = getNameColor(store.name, 0.64);
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.55)`;
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.92)`;
+        ctx.lineWidth = Math.max(0.06, 1.4 / Math.max(snapshot.width, snapshot.height));
+        for (const entry of store.nonEmptyEntries) {
+          if (!entry.steps.length) {
+            continue;
+          }
+          ctx.beginPath();
+          for (let i = 0; i < entry.steps.length; i++) {
+            const step = entry.steps[i];
+            const x = (step % snapshot.width) + 0.5;
+            const y = Math.floor(step / snapshot.width) + 0.5;
+            if (i === 0) {
+              ctx.moveTo(x, y);
+            } else {
+              ctx.lineTo(x, y);
+            }
+          }
+          ctx.stroke();
+
+          const currentCell = getCurrentPathStepValue(entry);
+          if (currentCell !== null) {
+            const x = currentCell % snapshot.width;
+            const y = Math.floor(currentCell / snapshot.width);
+            ctx.fillRect(x + 0.26, y + 0.26, 0.48, 0.48);
+          }
+        }
+      }
+    }
+
+    function drawCompositeSelection(ctx, x, y, width, height) {
+      ctx.save();
+      ctx.strokeStyle = "#ff6b57";
+      ctx.lineWidth = Math.max(0.05, 2 / Math.max(width, height));
+      ctx.strokeRect(x + 0.05, y + 0.05, 0.9, 0.9);
+      ctx.restore();
+    }
+
+    function getCompositeLayerSample(layer, cellIndex, options = null) {
+      if (options?.transparentZero && isZeroCompositeValue(layer, cellIndex)) {
+        return null;
+      }
+      if (layer.kind === 0 || layer.kind === 1 || layer.kind === 2) {
+        return { color: getLayerColor(layer, cellIndex, options?.ramp), alpha: 0.72 };
+      }
+      if (layer.kind === 3) {
+        if (!readBit(layer.words, cellIndex)) {
+          return null;
+        }
+        return { color: getBitLayerOverlayColor(layer), alpha: 0.78 };
+      }
+      if (layer.kind === 5) {
+        const count = layer.tagCounts[cellIndex] || 0;
+        if (count <= 0) {
+          return null;
+        }
+        const max = layer.maxTagCount || 1;
+        return {
+          color: getTagLayerOverlayColor(layer),
+          alpha: 0.20 + (count / max) * 0.42,
+        };
+      }
+      if (layer.kind === 6) {
+        if (layer.directions[cellIndex] === 255) {
+          return { color: [179, 188, 198], alpha: 0.18 };
+        }
+        return { color: [95, 132, 157], alpha: 0.18 };
+      }
+      return null;
+    }
+
+    function isZeroCompositeValue(layer, cellIndex) {
+      if (layer.kind === 0 || layer.kind === 1) {
+        return Number(layer.values[cellIndex]) === 0;
+      }
+      if (layer.kind === 2) {
+        return layer.values[cellIndex] === 0n;
+      }
+      return false;
+    }
+
+    function getBitLayerOverlayColor(layer) {
+      const name = layer.name.toLowerCase();
+      if (name.includes("road")) return [198, 144, 81];
+      if (name.includes("water")) return [92, 152, 214];
+      if (name.includes("walk")) return [85, 167, 111];
+      return getNameColor(layer.name, 0.74);
+    }
+
+    function getTagLayerOverlayColor(layer) {
+      return getNameColor(layer.name, 0.62);
+    }
+
+    function getNameColor(name, saturationScale) {
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0;
+      }
+      const hue = Math.abs(hash) % 360;
+      return hslToRgb(hue / 360, saturationScale, 0.52);
+    }
+
+    function hslToRgb(h, s, l) {
+      if (s === 0) {
+        const gray = Math.round(l * 255);
+        return [gray, gray, gray];
+      }
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      const r = hueToRgb(p, q, h + 1 / 3);
+      const g = hueToRgb(p, q, h);
+      const b = hueToRgb(p, q, h - 1 / 3);
+      return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+    }
+
+    function hueToRgb(p, q, t) {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    }
+
+    function blendPixel(data, pixelIndex, color, alpha) {
+      data[pixelIndex + 0] = Math.round(data[pixelIndex + 0] * (1 - alpha) + color[0] * alpha);
+      data[pixelIndex + 1] = Math.round(data[pixelIndex + 1] * (1 - alpha) + color[1] * alpha);
+      data[pixelIndex + 2] = Math.round(data[pixelIndex + 2] * (1 - alpha) + color[2] * alpha);
+    }
+
+    function getLayerColor(layer, cellIndex, rampOverride = null) {
+      const ramp = getResolvedLayerRamp(layer, rampOverride);
+      if (layer.kind === 0) {
+        return colorRamp(normalize(layer.values[cellIndex], layer.stats.min, layer.stats.max), ramp.min, ramp.max);
+      }
+      if (layer.kind === 1) {
+        return colorRamp(normalize(layer.values[cellIndex], layer.stats.min, layer.stats.max), ramp.min, ramp.max);
+      }
+      if (layer.kind === 2) {
+        return colorRampBigInt(normalizeBigInt(layer.values[cellIndex], layer.stats.min, layer.stats.max), ramp.min, ramp.max);
+      }
+      if (layer.kind === 3) {
+        return readBit(layer.words, cellIndex) ? [10, 132, 255] : [223, 230, 236];
+      }
+      if (layer.kind === 4) {
+        const count = layer.cellCounts[cellIndex] || 0;
+        const max = layer.maxCellCount || 1;
+        return colorRamp(count / max, [242, 246, 249], [184, 116, 60]);
+      }
+      if (layer.kind === 5) {
+        const count = layer.tagCounts[cellIndex] || 0;
+        const max = layer.maxTagCount || 1;
+        return count > 0 ? colorRamp(count / max, [242, 246, 249], [214, 177, 100]) : [242, 246, 249];
+      }
+      if (layer.kind === 6) {
+        if (layer.directions[cellIndex] === 255) {
+          return [219, 226, 232];
+        }
+        return colorRampBigInt(normalizeBigInt(layer.costs[cellIndex], layer.minCost, layer.maxCost), [242, 246, 249], [95, 132, 157]);
+      }
+      return [200, 200, 200];
+    }
+
+    function getResolvedLayerRamp(layer, rampOverride) {
+      const ramp = rampOverride || getDefaultLayerRampHex(layer);
+      return {
+        min: hexToRgb(ramp.min),
+        max: hexToRgb(ramp.max),
+      };
+    }
+
+    function hexToRgb(hex) {
+      const normalized = String(hex || "").trim();
+      const value = normalized.startsWith("#") ? normalized.slice(1) : normalized;
+      if (!/^[0-9a-fA-F]{6}$/.test(value)) {
+        return [242, 246, 249];
+      }
+
+      return [
+        parseInt(value.slice(0, 2), 16),
+        parseInt(value.slice(2, 4), 16),
+        parseInt(value.slice(4, 6), 16),
+      ];
+    }
+
+    function getCellIndexRowIds(layer, cellIndex) {
+      const rowIds = [];
+      let current = layer.heads.has(cellIndex) ? layer.heads.get(cellIndex) : -1;
+      while (current >= 0) {
+        rowIds.push(current);
+        current = layer.next[current];
+      }
+      return rowIds;
+    }
+
+    function getRequiredTable(snapshot, name) {
+      const table = snapshot.tables.find((item) => item.name === name);
+      if (!table) {
+        throw new Error(`Table not found: ${name}`);
+      }
+      return table;
+    }
+
+    function getRequiredLayer(snapshot, name) {
+      const layer = snapshot.layers.find((item) => item.name === name);
+      if (!layer) {
+        throw new Error(`Layer not found: ${name}`);
+      }
+      return layer;
+    }
+
+    function getRequiredStore(snapshot, name) {
+      const store = snapshot.stores.find((item) => item.name === name);
+      if (!store) {
+        throw new Error(`Store not found: ${name}`);
+      }
+      return store;
+    }
+
+    function getTableUi(tableName) {
+      if (!state.tableUi[tableName]) {
+        state.tableUi[tableName] = {
+          search: "",
+          rowIdFilter: "",
+          hideDeleted: false,
+          page: 0,
+          pageSize: 100,
+          selectedRowId: null,
+        };
+      }
+      return state.tableUi[tableName];
+    }
+
+    function getLayerUi(layerName) {
+      if (!state.layerUi[layerName]) {
+        state.layerUi[layerName] = { x: 0, y: 0 };
+      }
+      return state.layerUi[layerName];
+    }
+
+    function getStoreUi(storeName) {
+      if (!state.storeUi[storeName]) {
+        state.storeUi[storeName] = {
+          showEmpty: false,
+          rowIdFilter: "",
+          selectedRowId: null,
+        };
+      }
+      return state.storeUi[storeName];
+    }
+
+    function getFrameUi() {
+      if (!state.frameUi) {
+        state.frameUi = {
+          selectedOrder: null,
+        };
+      }
+      return state.frameUi;
+    }
+
+    function resolveSelectedFrameCommand(frameRecord, ui) {
+      if (!frameRecord) {
+        return null;
+      }
+      const selected = frameRecord.commands.find((command) => command.order === ui.selectedOrder);
+      return selected || frameRecord.commands[0] || null;
+    }
+
+    function getMapUi(snapshot = state.snapshot) {
+      if (!state.mapUi) {
+        state.mapUi = {
+          x: 0,
+          y: 0,
+          layerVisibility: {},
+          layerTransparency: {},
+          layerColorRamp: {},
+          storeVisibility: {},
+          overlayVisibility: { construction: true },
+        };
+      }
+      if (snapshot) {
+        ensureMapUiForSnapshot(snapshot);
+      }
+      return state.mapUi;
+    }
+
+    function ensureMapUiForSnapshot(snapshot) {
+      const ui = state.mapUi || (state.mapUi = {
+        x: 0,
+        y: 0,
+        layerVisibility: {},
+        layerTransparency: {},
+        layerColorRamp: {},
+        storeVisibility: {},
+        overlayVisibility: { construction: true },
+      });
+      const preferredBaseName = choosePreferredBaseLayerName(snapshot.layers);
+
+      for (const key of Object.keys(ui.layerVisibility)) {
+        if (!snapshot.layers.some((layer) => layer.name === key)) {
+          delete ui.layerVisibility[key];
+        }
+      }
+      for (const key of Object.keys(ui.layerTransparency || {})) {
+        if (!snapshot.layers.some((layer) => layer.name === key)) {
+          delete ui.layerTransparency[key];
+        }
+      }
+      for (const key of Object.keys(ui.layerColorRamp || {})) {
+        if (!snapshot.layers.some((layer) => layer.name === key)) {
+          delete ui.layerColorRamp[key];
+        }
+      }
+      for (const key of Object.keys(ui.storeVisibility)) {
+        if (!snapshot.stores.some((store) => store.name === key)) {
+          delete ui.storeVisibility[key];
+        }
+      }
+      if (!ui.layerTransparency) {
+        ui.layerTransparency = {};
+      }
+      if (!ui.layerColorRamp) {
+        ui.layerColorRamp = {};
+      }
+      if (!ui.overlayVisibility) {
+        ui.overlayVisibility = { construction: true };
+      }
+      if (!("construction" in ui.overlayVisibility)) {
+        ui.overlayVisibility.construction = true;
+      }
+
+      snapshot.layers.forEach((layer) => {
+        if (!(layer.name in ui.layerVisibility)) {
+          ui.layerVisibility[layer.name] = getDefaultMapLayerVisibility(layer, preferredBaseName);
+        }
+        if (!(layer.name in ui.layerTransparency)) {
+          ui.layerTransparency[layer.name] = false;
+        }
+        if (!(layer.name in ui.layerColorRamp)) {
+          ui.layerColorRamp[layer.name] = getDefaultLayerRampHex(layer);
+        }
+      });
+      snapshot.stores.forEach((store) => {
+        if (!(store.name in ui.storeVisibility)) {
+          ui.storeVisibility[store.name] = false;
+        }
+      });
+
+      ui.x = clamp(ui.x, 0, Math.max(0, snapshot.width - 1));
+      ui.y = clamp(ui.y, 0, Math.max(0, snapshot.height - 1));
+    }
+
+    function resetMapUiForSnapshot(snapshot) {
+      state.mapUi = {
+        x: 0,
+        y: 0,
+        layerVisibility: {},
+        layerTransparency: {},
+        layerColorRamp: {},
+        storeVisibility: {},
+        overlayVisibility: { construction: true },
+      };
+      ensureMapUiForSnapshot(snapshot);
+    }
+
+    function supportsZeroTransparency(layer) {
+      return layer.kind === 0 || layer.kind === 1 || layer.kind === 2;
+    }
+
+    function supportsLayerRampEditor(layer) {
+      return layer.kind === 0 || layer.kind === 1 || layer.kind === 2;
+    }
+
+    function getDefaultLayerRampHex(layer) {
+      if (layer.kind === 0) {
+        return { min: "#f2f6f9", max: "#0a84ff" };
+      }
+      if (layer.kind === 1) {
+        return { min: "#f2f6f9", max: "#b8743c" };
+      }
+      if (layer.kind === 2) {
+        return { min: "#f2f6f9", max: "#437ba5" };
+      }
+      return { min: "#f2f6f9", max: "#0a84ff" };
+    }
+
+    function choosePreferredBaseLayerName(layers) {
+      const preferredNames = ["terrain", "terraintype", "height", "biome", "fertility", "resourceamount"];
+      for (const preferred of preferredNames) {
+        const match = layers.find((layer) => (layer.kind === 0 || layer.kind === 1 || layer.kind === 2) && layer.name.toLowerCase().includes(preferred));
+        if (match) {
+          return match.name;
+        }
+      }
+      const firstValueLayer = layers.find((layer) => layer.kind === 0 || layer.kind === 1 || layer.kind === 2);
+      return firstValueLayer ? firstValueLayer.name : null;
+    }
+
+    function getDefaultMapLayerVisibility(layer, preferredBaseName) {
+      const lowerName = layer.name.toLowerCase();
+      if (layer.kind === 4) {
+        return true;
+      }
+      if (layer.kind === 5 || layer.kind === 6) {
+        return false;
+      }
+      if (layer.kind === 3) {
+        if (lowerName.includes("road") || lowerName.includes("water")) return true;
+        if (lowerName.includes("walk")) return false;
+        return false;
+      }
+      if (layer.kind === 0 || layer.kind === 1 || layer.kind === 2) {
+        return preferredBaseName === layer.name;
+      }
+      return false;
+    }
+
+    function buildMapLayerGroups(layers) {
+      const groups = [
+        { title: "Surface Layers", items: layers.filter((layer) => layer.kind === 0 || layer.kind === 1 || layer.kind === 2) },
+        { title: "Mask Layers", items: layers.filter((layer) => layer.kind === 3 || layer.kind === 5 || layer.kind === 6) },
+        { title: "Cell Indices", items: layers.filter((layer) => layer.kind === 4) },
+      ];
+      return groups.filter((group) => group.items.length > 0);
+    }
+
+    function formatRowIdList(rowIds) {
+      if (!rowIds.length) {
+        return "None";
+      }
+      const limit = 14;
+      const visible = rowIds.slice(0, limit).join(", ");
+      return rowIds.length > limit ? `${visible}, +${rowIds.length - limit} more` : visible;
+    }
+
+    function formatCellIndex(x, y, width) {
+      return String(y * width + x);
+    }
+
+    function metricCard(label, value, sub) {
+      return `
+        <div class="metric">
+          <span class="metric-label">${escapeHtml(label)}</span>
+          <div class="metric-value">${escapeHtml(value)}</div>
+          <div class="metric-sub">${escapeHtml(sub)}</div>
+        </div>
+      `;
+    }
+
+    function renderSummaryOverviewGrid(snapshot) {
+      return [
+        metricCard("File", escapeHtml(snapshot.fileName), `${snapshot.byteLength.toLocaleString()} bytes`),
+        metricCard("Version", String(snapshot.version), "Supported formats: 2, 3, and 4"),
+        metricCard("Tick", formatBigInt(snapshot.tick), "Unsigned 64-bit tick"),
+        metricCard("State Hash", formatShortStateHash(snapshot.stateHashHex), "Same value means the serialized state is unchanged even if tick differs"),
+        metricCard("Grid", `${snapshot.width} x ${snapshot.height}`, `${(snapshot.width * snapshot.height).toLocaleString()} cells`),
+        metricCard("Tables", String(snapshot.tables.length), `${snapshot.tables.reduce((sum, table) => sum + table.highWater, 0).toLocaleString()} row slots`),
+        metricCard("Layers", String(snapshot.layers.length), `${snapshot.layers.map((layer) => layer.kindLabel).join(", ")}`),
+        metricCard("Globals", String(snapshot.globals.length), snapshot.globals.length ? snapshot.globals.map((g) => g.key).slice(0, 4).join(", ") : "No globals"),
+        metricCard("Stores", String(snapshot.stores.length), snapshot.stores.length ? snapshot.stores.map((s) => s.name).join(", ") : "No stores"),
+        metricCard("Db Commands", String(snapshot.frameRecord ? snapshot.frameRecord.commandCount : 0), snapshot.frameRecord ? "Persisted with this snapshot" : "Not stored in this snapshot"),
+      ].join("");
+    }
+
+    function renderSummaryTimelineGrid(snapshot) {
+      if (!state.timeline) {
+        return "";
+      }
+
+      return [
+        metricCard("Source", state.timeline.sourceLabel, `${state.timeline.frames.length} frames loaded`),
+        metricCard("Current frame", `${state.timeline.currentIndex + 1} / ${state.timeline.frames.length}`, `Tick ${formatBigInt(snapshot.tick)}`),
+        metricCard("State delta", describeStateChange(snapshot, state.timeline.currentIndex === 0), "Compares current frame hash with the previous frame"),
+        metricCard("First tick", formatBigInt(state.timeline.frames[0].tick), baseName(state.timeline.frames[0].fileName)),
+        metricCard("Last tick", formatBigInt(state.timeline.frames[state.timeline.frames.length - 1].tick), baseName(state.timeline.frames[state.timeline.frames.length - 1].fileName)),
+      ].join("");
+    }
+
+    function renderSummaryModelingGrid(snapshot) {
+      const construction = getConstructionSnapshot(snapshot);
+      const activeConstructionText = construction.active
+        ? `${construction.active.name} (${construction.active.statusLabel})`
+        : "No active site";
+      const activeConstructionSub = construction.active
+        ? `${formatConstructionProgress(construction.active)} | ${formatConstructionMaterials(construction.active)}`
+        : `${construction.completeCount}/${construction.totalCount} sites complete`;
+      return [
+        metricCard("Largest table", summarizeLargestTable(snapshot), "By highWater row slots"),
+        metricCard("Most populated layer", summarizeLayerPopulation(snapshot), "Based on layer-specific stats"),
+        metricCard("Deleted rows", String(countDeletedRows(snapshot)), "Useful for allocator debugging"),
+        metricCard("Active paths", String(countActivePaths(snapshot)), "Non-empty DetPath slots"),
+        metricCard("Construction", activeConstructionText, activeConstructionSub),
+        metricCard("Pending sites", String(construction.pendingCount), construction.rows.map((row) => row.name).join(", ") || "No queued construction"),
+      ].join("");
+    }
+
+    function renderGlobalsRows(snapshot) {
+      if (snapshot.globals.length === 0) {
+        return `<tr><td colspan="3">No globals in this snapshot.</td></tr>`;
+      }
+
+      return snapshot.globals.map((globalValue) => `
+        <tr>
+          <td class="mono">${escapeHtml(globalValue.key)}</td>
+          <td>${escapeHtml(globalValue.displayValue)}</td>
+          <td class="mono">${formatBigInt(globalValue.rawValue)}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderStoreRows(filtered, selectedEntry, width) {
+      if (filtered.length === 0) {
+        return `<tr><td colspan="5">No path entries match the current filter.</td></tr>`;
+      }
+
+      return filtered.map((entry) => `
+        <tr data-store-row="${entry.rowId}" style="cursor:pointer; background:${selectedEntry && selectedEntry.rowId === entry.rowId ? "rgba(10,132,255,0.08)" : "transparent"};">
+          <td class="mono">${entry.rowId}</td>
+          <td>${entry.length}</td>
+          <td>${entry.currentStep}</td>
+          <td class="mono">${entry.length > 0 ? escapeHtml(formatPathStepText(getCurrentPathStepValue(entry), width)) : "-"}</td>
+          <td>${entry.length > 0 ? `<span class="badge ok">Active</span>` : `<span class="badge warn">Empty</span>`}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderStoreDetail(selectedEntry, width) {
+      if (!selectedEntry) {
+        return `<div class="detail-row"><div class="detail-value">No entry selected.</div></div>`;
+      }
+
+      return `
+        <div class="detail-list">
+          <div class="detail-row">
+            <span class="detail-label">Row ID</span>
+            <div class="detail-value mono">${selectedEntry.rowId}</div>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Length</span>
+            <div class="detail-value">${selectedEntry.length}</div>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Current Step</span>
+            <div class="detail-value">${selectedEntry.currentStep}</div>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Start Cell</span>
+            <div class="detail-value mono">${selectedEntry.steps.length ? escapeHtml(formatPathStepText(selectedEntry.steps[0], width)) : "No path data"}</div>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Current Cell</span>
+            <div class="detail-value mono">${selectedEntry.steps.length ? escapeHtml(formatPathStepText(getCurrentPathStepValue(selectedEntry), width)) : "No path data"}</div>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Goal Cell</span>
+            <div class="detail-value mono">${selectedEntry.steps.length ? escapeHtml(formatPathStepText(selectedEntry.steps[selectedEntry.steps.length - 1], width)) : "No path data"}</div>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Steps</span>
+            <div class="detail-value">${renderPathStepList(selectedEntry, width)}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderFrameInspector(frameRecord, selectedCommand) {
+      if (!selectedCommand) {
+        return `
+          <div class="inspector-stack">
+            ${renderInspectorCard("Recorded Tick", formatBigInt(frameRecord.tick), true)}
+            ${renderInspectorCard("Command Count", String(frameRecord.commandCount), true)}
+            ${renderInspectorCard("State Hash", frameRecord.stateHashHex || "—", true)}
+            ${renderInspectorCard("Frame Hash", frameRecord.frameHashHex || "—", true)}
+            ${renderInspectorCard("Changed Tables", frameRecord.summary.changedTables.join(", ") || "none")}
+            ${renderInspectorCard("Changed Layers", frameRecord.summary.changedLayers.join(", ") || "none")}
+            ${renderInspectorCard("Changed Indices", frameRecord.summary.changedIndices.join(", ") || "none")}
+          </div>
+        `;
+      }
+
+      return `
+        <div class="inspector-stack">
+          ${renderInspectorCard("Order", String(selectedCommand.order), true)}
+          ${renderInspectorCard("Kind", selectedCommand.kindLabel)}
+          ${renderInspectorCard("Target", selectedCommand.targetName || "—", true)}
+          ${renderInspectorCard("Field", selectedCommand.fieldName || "—", true)}
+          ${renderInspectorCard("Row", formatFrameCommandRowId(selectedCommand), true)}
+          ${renderInspectorCard("Cell", formatFrameCommandCell(selectedCommand), true)}
+          ${renderInspectorCardHtml("Value", formatFrameCommandValue(selectedCommand), "mono")}
+          ${renderInspectorCard("State Hash", frameRecord.stateHashHex || "—", true)}
+          ${renderInspectorCard("Frame Hash", frameRecord.frameHashHex || "—", true)}
+        </div>
+      `;
+    }
+
+    function renderInspectorCard(label, value, mono) {
+      return `
+        <div class="detail-row">
+          <span class="detail-label">${escapeHtml(label)}</span>
+          <div class="detail-value ${mono ? "mono" : ""}">${escapeHtml(String(value))}</div>
+        </div>
+      `;
+    }
+
+    function renderInspectorCardHtml(label, html, valueClassName) {
+      return `
+        <div class="detail-row">
+          <span class="detail-label">${escapeHtml(label)}</span>
+          <div class="detail-value ${valueClassName || ""}">${html}</div>
+        </div>
+      `;
+    }
+
+    function renderTableInspectorCard(table, column, value, rowId) {
+      const metaHtml = column.isDerived
+        ? `
+          <div class="derived-note">
+            <span class="badge derived">Derived</span>
+            ${column.isEditable ? "" : `<span class="badge locked">Read-only</span>`}
+            ${column.source ? `<span class="pill">Source ${escapeHtml(column.source)}</span>` : ""}
+          </div>
+        `
+        : "";
+
+      if (isLayoutMaskColumn(column.name)) {
+        const layoutText = getTableColumnRawValue(table, column.name, rowId);
+        if (typeof layoutText === "string" && layoutText.length > 0) {
+          const width = getNumericTableColumnRawValue(table, "width", rowId);
+          const height = getNumericTableColumnRawValue(table, "height", rowId);
+          const normalized = normalizeLayoutMaskText(layoutText, width, height);
+          const dimensionText = width > 0 && height > 0 ? `${width} x ${height}` : "Raw text mask";
+          return renderInspectorCardHtml(
+            column.name,
+            `<pre class="layout-mask">${escapeHtml(normalized)}</pre><div class="layout-mask-meta">${escapeHtml(dimensionText)}</div>${metaHtml}`,
+            "layout-mask-value"
+          );
+        }
+      }
+
+      if (column.isDerived) {
+        return renderInspectorCardHtml(
+          column.name,
+          `${escapeHtml(formatValueForInspector(value))}${metaHtml}`,
+          value.kind === "mono" ? "mono" : ""
+        );
+      }
+
+      return renderInspectorCard(column.name, formatValueForInspector(value), value.kind === "mono");
+    }
+
+    function resolveSelectedTableRow(table, ui, filteredRows) {
+      if (ui.selectedRowId !== null && ui.selectedRowId >= 0 && ui.selectedRowId < table.highWater) {
+        const exists = table.alive[ui.selectedRowId] === 1;
+        const values = table.columns.map((column) => describeColumnValue(column, ui.selectedRowId));
+        return { rowId: ui.selectedRowId, exists, values };
+      }
+
+      if (filteredRows.length > 0) {
+        ui.selectedRowId = filteredRows[0].rowId;
+        return filteredRows[0];
+      }
+
+      return null;
+    }
+
+    function formatValueForInspector(value) {
+      if (value.kind === "fix64") {
+        return `${value.primary} (${value.secondary})`;
+      }
+      return value.primary;
+    }
+
+    function formatDetailForInspector(detail) {
+      if (detail.kind === "rowIds") {
+        return detail.items.length ? detail.items.join(", ") : "None";
+      }
+      if (detail.kind === "tags") {
+        return detail.items.length ? detail.items.join(", ") : "None";
+      }
+      if (detail.kind === "stack") {
+        return `${detail.primary} (${detail.secondary})`;
+      }
+      return detail.primary;
+    }
+
+    function summarizeLargestTable(snapshot) {
+      if (!snapshot.tables.length) return "None";
+      const table = [...snapshot.tables].sort((a, b) => b.highWater - a.highWater)[0];
+      return `${table.name} (${table.highWater})`;
+    }
+
+    function summarizeLayerPopulation(snapshot) {
+      if (!snapshot.layers.length) return "None";
+      const scored = snapshot.layers.map((layer) => ({
+        name: layer.name,
+        score: layer.kind === 3 ? layer.trueCount :
+          layer.kind === 4 ? layer.placedRows :
+          layer.kind === 5 ? layer.totalTags :
+          layer.kind === 6 ? (layer.width * layer.height) - layer.blockedCount :
+          layer.kind === 0 ? layer.stats.nonZero :
+          layer.kind === 1 ? layer.width * layer.height :
+          layer.kind === 2 ? layer.width * layer.height : 0,
+      }));
+      scored.sort((a, b) => b.score - a.score);
+      return `${scored[0].name} (${scored[0].score})`;
+    }
+
+    function countDeletedRows(snapshot) {
+      return snapshot.tables.reduce((sum, table) => sum + (table.highWater - table.existingCount), 0);
+    }
+
+    function countActivePaths(snapshot) {
+      return snapshot.stores.reduce((sum, store) => sum + store.nonEmptyEntries.length, 0);
+    }
+
+    function getOptionalTable(snapshot, name) {
+      return snapshot.tables.find((item) => item.name === name) || null;
+    }
+
+    function getOptionalLayer(snapshot, name) {
+      return snapshot.layers.find((item) => item.name === name) || null;
+    }
+
+    function getExistingTableRowIds(table) {
+      const rows = [];
+      for (let rowId = 0; rowId < table.highWater; rowId++) {
+        if (table.alive[rowId] === 1) {
+          rows.push(rowId);
+        }
+      }
+      return rows;
+    }
+
+    function getBuildingStatusLabel(status) {
+      switch (status) {
+        case 0: return "Planned";
+        case 1: return "Delivering";
+        case 2: return "Building";
+        case 3: return "Complete";
+        default: return "Unknown";
+      }
+    }
+
+    function getBuildingRows(snapshot) {
+      const table = getOptionalTable(snapshot, "buildings");
+      if (!table) {
+        return [];
+      }
+
+      return getExistingTableRowIds(table).map((rowId) => {
+        const requiredWork = getNumericTableColumnRawValue(table, "requiredWork", rowId);
+        const progress = getNumericTableColumnRawValue(table, "constructionProgress", rowId);
+        const buildOrder = getNumericTableColumnRawValue(table, "buildOrder", rowId);
+        const status = getNumericTableColumnRawValue(table, "status", rowId);
+        return {
+          rowId,
+          name: String(getTableColumnRawValue(table, "name", rowId) || `Building ${rowId}`),
+          buildOrder,
+          status,
+          statusLabel: getBuildingStatusLabel(status),
+          anchorX: getNumericTableColumnRawValue(table, "anchorX", rowId),
+          anchorY: getNumericTableColumnRawValue(table, "anchorY", rowId),
+          accessX: getNumericTableColumnRawValue(table, "primaryAccessX", rowId),
+          accessY: getNumericTableColumnRawValue(table, "primaryAccessY", rowId),
+          wood: getNumericTableColumnRawValue(table, "stockWood", rowId),
+          stone: getNumericTableColumnRawValue(table, "stockStone", rowId),
+          food: getNumericTableColumnRawValue(table, "stockFood", rowId),
+          requiredWood: getNumericTableColumnRawValue(table, "requiredWood", rowId),
+          requiredStone: getNumericTableColumnRawValue(table, "requiredStone", rowId),
+          requiredFood: getNumericTableColumnRawValue(table, "requiredFood", rowId),
+          progress,
+          requiredWork,
+          populationCapacity: getNumericTableColumnRawValue(table, "populationCapacity", rowId),
+          populationGranted: getNumericTableColumnRawValue(table, "populationGranted", rowId),
+          isConstructionSite: buildOrder > 0,
+          isComplete: requiredWork <= 0 ? status === 3 : progress >= requiredWork || status === 3,
+        };
+      });
+    }
+
+    function getConstructionSnapshot(snapshot) {
+      const rows = getBuildingRows(snapshot)
+        .filter((row) => row.isConstructionSite)
+        .sort((a, b) => a.buildOrder - b.buildOrder || a.rowId - b.rowId);
+      const active = rows.find((row) => !row.isComplete) || null;
+      return {
+        rows,
+        active,
+        pendingCount: rows.filter((row) => !row.isComplete).length,
+        completeCount: rows.filter((row) => row.isComplete).length,
+        totalCount: rows.length,
+      };
+    }
+
+    function formatConstructionProgress(row) {
+      return `${row.progress}/${row.requiredWork || 0}`;
+    }
+
+    function formatConstructionMaterials(row) {
+      return `${row.wood}/${row.requiredWood}W | ${row.stone}/${row.requiredStone}S | ${row.food}/${row.requiredFood}F`;
+    }
+
+    function getBuildingRowForCell(snapshot, x, y) {
+      const rows = getBuildingRows(snapshot);
+      if (!rows.length) {
+        return null;
+      }
+
+      const placementLayer = getOptionalLayer(snapshot, "placementId");
+      if (placementLayer && (placementLayer.kind === 1 || placementLayer.kind === 2 || placementLayer.kind === 0)) {
+        const rowId = Number(placementLayer.values[(y * snapshot.width) + x]);
+        if (Number.isFinite(rowId) && rowId >= 0) {
+          return rows.find((row) => row.rowId === rowId) || null;
+        }
+      }
+
+      return rows.find((row) => row.accessX === x && row.accessY === y) || null;
+    }
+
+    function isLayoutMaskColumn(columnName) {
+      const normalized = String(columnName || "").toLowerCase();
+      return normalized === "layouttext" || normalized.endsWith("masktext");
+    }
+
+    function getTableColumn(table, columnName) {
+      return table.columns.find((column) => column.name === columnName) || null;
+    }
+
+    function getTableColumnRawValue(table, columnName, rowId) {
+      const column = getTableColumn(table, columnName);
+      if (!column || rowId < 0 || rowId >= column.data.length) {
+        return null;
+      }
+      return column.data[rowId];
+    }
+
+    function getNumericTableColumnRawValue(table, columnName, rowId) {
+      const rawValue = getTableColumnRawValue(table, columnName, rowId);
+      return Number.isFinite(Number(rawValue)) ? Number(rawValue) : 0;
+    }
+
+    function normalizeLayoutMaskText(layoutText, width, height) {
+      const normalized = String(layoutText).replace(/\r/g, "");
+      let lines = normalized.includes("\n")
+        ? normalized.split("\n")
+        : width > 0
+          ? chunkString(normalized, width)
+          : [normalized];
+
+      const targetWidth = width > 0 ? width : Math.max(0, ...lines.map((line) => line.length));
+      if (targetWidth > 0) {
+        lines = lines.map((line) => line.padEnd(targetWidth, ".").slice(0, targetWidth));
+      }
+
+      if (height > 0) {
+        while (lines.length < height) {
+          lines.push(".".repeat(Math.max(targetWidth, 0)));
+        }
+        lines = lines.slice(0, height);
+      }
+
+      return lines.join("\n");
+    }
+
+    function chunkString(text, width) {
+      if (!width || width <= 0) {
+        return [text];
+      }
+
+      const chunks = [];
+      for (let index = 0; index < text.length; index += width) {
+        chunks.push(text.slice(index, index + width));
+      }
+      return chunks.length ? chunks : [""];
+    }
+
+    function tryPatchCurrentMainView() {
+      if (!state.snapshot) {
+        return false;
+      }
+
+      if (state.view.type === "summary") {
+        return tryPatchSummaryView(state.snapshot);
+      }
+
+      if (state.view.type === "globals") {
+        return tryPatchGlobalsView(state.snapshot);
+      }
+
+      if (state.view.type === "frame") {
+        return tryPatchFrameView(state.snapshot);
+      }
+
+      if (state.view.type === "map") {
+        return tryPatchMapView(state.snapshot);
+      }
+
+      if (state.view.type === "table") {
+        return tryPatchTableView(getRequiredTable(state.snapshot, state.view.name));
+      }
+
+      if (state.view.type === "layer") {
+        return tryPatchLayerView(getRequiredLayer(state.snapshot, state.view.name));
+      }
+
+      if (state.view.type === "store") {
+        return tryPatchStoreView(getRequiredStore(state.snapshot, state.view.name));
+      }
+
+      return false;
+    }
+
+    function tryPatchSummaryView(snapshot) {
+      const summaryView = mainPanel.querySelector('[data-summary-view="1"]');
+      if (!summaryView) {
+        return false;
+      }
+
+      const overviewGrid = summaryView.querySelector('[data-summary-grid="overview"]');
+      const modelingGrid = summaryView.querySelector('[data-summary-grid="modeling"]');
+      if (!overviewGrid || !modelingGrid) {
+        return false;
+      }
+
+      overviewGrid.innerHTML = renderSummaryOverviewGrid(snapshot);
+      modelingGrid.innerHTML = renderSummaryModelingGrid(snapshot);
+
+      const timelineGrid = summaryView.querySelector('[data-summary-grid="timeline"]');
+      if (timelineGrid) {
+        timelineGrid.innerHTML = renderSummaryTimelineGrid(snapshot);
+      }
+
+      return true;
+    }
+
+    function tryPatchGlobalsView(snapshot) {
+      const globalsView = mainPanel.querySelector('[data-globals-view="1"]');
+      if (!globalsView) {
+        return false;
+      }
+
+      const globalsBody = globalsView.querySelector('[data-globals-body]');
+      if (!globalsBody) {
+        return false;
+      }
+
+      globalsBody.innerHTML = renderGlobalsRows(snapshot);
+      return true;
+    }
+
+    function tryPatchFrameView(snapshot) {
+      const frameView = mainPanel.querySelector('[data-frame-view="1"]');
+      if (!frameView || !snapshot.frameRecord) {
+        return false;
+      }
+
+      const ui = getFrameUi();
+      const selectedCommand = resolveSelectedFrameCommand(snapshot.frameRecord, ui);
+      patchText(frameView.querySelector('[data-frame-stat="commands"]'), `${snapshot.frameRecord.commandCount} commands`);
+      patchText(frameView.querySelector('[data-frame-stat="tables"]'), `${snapshot.frameRecord.summary.changedTables.length} tables`);
+      patchText(frameView.querySelector('[data-frame-stat="layers"]'), `${snapshot.frameRecord.summary.changedLayers.length} layers`);
+      patchText(frameView.querySelector('[data-frame-stat="indices"]'), `${snapshot.frameRecord.summary.changedIndices.length} indices`);
+
+      const frameBody = frameView.querySelector('[data-frame-body]');
+      const frameDetail = frameView.querySelector('[data-frame-detail]');
+      const frameMetrics = frameView.querySelector('[data-frame-metrics]');
+      if (!frameBody || !frameDetail || !frameMetrics) {
+        return false;
+      }
+
+      frameMetrics.innerHTML = renderFrameMetrics(snapshot.frameRecord);
+      frameBody.innerHTML = renderFrameCommandRows(snapshot.frameRecord.commands, selectedCommand);
+      frameDetail.innerHTML = renderFrameSummaryCard(snapshot.frameRecord);
+      bindFrameCommandSelection();
+      return true;
+    }
+
+    function tryPatchTableView(table) {
+      const tableView = mainPanel.querySelector("[data-table-view]");
+      if (!tableView || tableView.dataset.tableView !== table.name) {
+        return false;
+      }
+
+      const ui = getTableUi(table.name);
+      const filteredRows = buildFilteredTableRows(table, ui);
+      const selectedRow = resolveSelectedTableRow(table, ui, filteredRows);
+      const pageCount = Math.max(1, Math.ceil(filteredRows.length / ui.pageSize));
+      ui.page = Math.min(ui.page, pageCount - 1);
+      const start = ui.page * ui.pageSize;
+      const pageRows = filteredRows.slice(start, start + ui.pageSize);
+
+      patchText(tableView.querySelector('[data-table-stat="live"]'), `${table.existingCount} live`);
+      patchText(tableView.querySelector('[data-table-stat="deleted"]'), `${table.highWater - table.existingCount} deleted`);
+      patchText(tableView.querySelector('[data-table-stat="columns"]'), `${table.columns.length} columns`);
+      patchText(tableView.querySelector('[data-table-stat="derived"]'), `${table.derivedColumnCount} derived`);
+      patchText(tableView.querySelector('[data-table-stat="free"]'), `${table.freeRowIds.length} free ids`);
+      patchText(
+        tableView.querySelector("[data-table-footer]"),
+        renderTableFooter(filteredRows.length, start, pageRows.length, ui.page, pageCount, table).replace(/\s+/g, " ").trim()
+      );
+
+      const prevPageButton = document.getElementById("prevPage");
+      const nextPageButton = document.getElementById("nextPage");
+      if (prevPageButton) {
+        prevPageButton.disabled = ui.page === 0;
+      }
+      if (nextPageButton) {
+        nextPageButton.disabled = ui.page >= pageCount - 1;
+      }
+
+      const tbody = tableView.querySelector("[data-table-body]");
+      if (!tbody) {
+        return false;
+      }
+
+      const currentRows = Array.from(tbody.querySelectorAll("[data-table-row]"));
+      const hasSameRowOrder =
+        currentRows.length === pageRows.length &&
+        currentRows.every((rowElement, index) => Number(rowElement.dataset.tableRow) === pageRows[index].rowId);
+
+      if (!hasSameRowOrder) {
+        tbody.innerHTML = renderTableBody(table, pageRows, selectedRow);
+        bindTableRowSelection(table.name);
+        return true;
+      }
+
+      if (pageRows.length === 0) {
+        tbody.innerHTML = renderTableBody(table, pageRows, selectedRow);
+        return true;
+      }
+
+      currentRows.forEach((rowElement, rowIndex) => {
+        const row = pageRows[rowIndex];
+        const isSelected = selectedRow && selectedRow.rowId === row.rowId;
+        rowElement.className = `${row.exists ? "" : "deleted"} ${isSelected ? "selected-row" : ""}`.trim();
+        rowElement.style.cursor = "pointer";
+
+        const cells = rowElement.children;
+        if (cells[1]) {
+          cells[1].innerHTML = row.exists ? `<span class="badge ok">Live</span>` : `<span class="badge warn">Deleted</span>`;
+        }
+
+        row.values.forEach((value, valueIndex) => {
+          const cell = cells[valueIndex + 2];
+          if (!cell) {
+            return;
+          }
+          const column = table.columns[valueIndex];
+          const classes = [];
+          const valueClass = getTableValueCellClassName(value);
+          if (valueClass) {
+            classes.push(valueClass);
+          }
+          if (column.isDerived) {
+            classes.push("derived-cell");
+            cell.title = getDerivedColumnMetaText(column);
+          } else {
+            cell.removeAttribute("title");
+          }
+          cell.className = classes.join(" ");
+          cell.innerHTML = renderTableValueCellInner(value);
+        });
+      });
+
+      return true;
+    }
+
+    function tryPatchMapView(snapshot) {
+      const mapView = mainPanel.querySelector('[data-map-view="1"]');
+      if (!mapView) {
+        return false;
+      }
+
+      const ui = getMapUi(snapshot);
+      const canvas = document.getElementById("mapCanvas");
+      if (!canvas) {
+        return false;
+      }
+      const construction = getConstructionSnapshot(snapshot);
+
+      patchText(mapView.querySelector('[data-map-stat="grid"]'), `${snapshot.width} x ${snapshot.height}`);
+      patchText(mapView.querySelector('[data-map-stat="layers"]'), `${snapshot.layers.filter((layer) => ui.layerVisibility[layer.name]).length} visible layers`);
+      patchText(mapView.querySelector('[data-map-stat="stores"]'), `${snapshot.stores.filter((store) => ui.storeVisibility[store.name]).length} visible stores`);
+      patchText(mapView.querySelector('[data-map-stat="construction"]'), construction.active ? `${construction.active.name} ${construction.active.statusLabel} ${formatConstructionProgress(construction.active)}` : "All construction complete");
+      patchText(mapView.querySelector('[data-map-stat="pending"]'), `${construction.pendingCount} pending sites`);
+      patchText(mapView.querySelector("[data-map-cell-label]"), `Cell (${ui.x}, ${ui.y})`);
+
+      drawCompositeMapPreview(canvas, snapshot, ui);
+
+      mapView.querySelectorAll("[data-map-item-name]").forEach((row) => {
+        const name = row.dataset.mapItemName;
+        const itemType = row.dataset.mapItemType;
+        const actualVisible = itemType === "overlay"
+          ? ui.overlayVisibility[name === "constructionOverlay" ? "construction" : name]
+          : itemType === "layer"
+            ? ui.layerVisibility[name]
+            : ui.storeVisibility[name];
+        row.classList.toggle("hidden", !actualVisible);
+
+        const visibilityEl = row.querySelector(".map-layer-visibility");
+        if (visibilityEl) {
+          visibilityEl.textContent = actualVisible ? "Shown" : "Hidden";
+        }
+
+        const toggle = row.querySelector("[data-map-toggle]");
+        if (toggle) {
+          toggle.checked = Boolean(actualVisible);
+        }
+
+        const meta = row.querySelector("[data-map-meta]");
+        if (meta) {
+          if (itemType === "layer") {
+            const layer = getRequiredLayer(snapshot, name);
+            meta.textContent = layer.summaryText;
+          } else if (itemType === "store") {
+            const store = getRequiredStore(snapshot, name);
+            meta.textContent = `${store.nonEmptyEntries.length} active paths`;
+          } else {
+            meta.textContent = construction.active ? `${construction.active.name} | ${formatConstructionMaterials(construction.active)}` : "No active site";
+          }
+        }
+
+        const transparencyButton = row.querySelector("[data-map-transparency]");
+        if (transparencyButton && itemType === "layer") {
+          const transparentZero = Boolean(ui.layerTransparency[name]);
+          transparencyButton.classList.toggle("active", transparentZero);
+          transparencyButton.textContent = transparentZero ? "Zero Transparent" : "Opaque Zero";
+        }
+
+        row.querySelectorAll("[data-map-color]").forEach((input) => {
+          if (itemType !== "layer") {
+            return;
+          }
+          const edge = input.dataset.mapColor;
+          const ramp = ui.layerColorRamp[name];
+          if (ramp && edge && ramp[edge]) {
+            input.value = ramp[edge];
+          }
+        });
+      });
+
+      return true;
+    }
+
+    function tryPatchLayerView(layer) {
+      const canvas = document.getElementById("layerCanvas");
+      if (!canvas) {
+        return false;
+      }
+
+      const ui = getLayerUi(layer.name);
+      const x = clamp(ui.x, 0, Math.max(0, state.snapshot.width - 1));
+      const y = clamp(ui.y, 0, Math.max(0, state.snapshot.height - 1));
+      ui.x = x;
+      ui.y = y;
+      drawLayerPreview(canvas, layer, x, y);
+      return true;
+    }
+
+    function tryPatchStoreView(store) {
+      const storeView = mainPanel.querySelector("[data-store-view]");
+      if (!storeView || storeView.dataset.storeView !== store.name) {
+        return false;
+      }
+
+      const ui = getStoreUi(store.name);
+      const entries = ui.showEmpty ? store.entries : store.nonEmptyEntries;
+      const filtered = entries.filter((entry) => ui.rowIdFilter === "" || entry.rowId === Number(ui.rowIdFilter));
+      const selectedEntry = filtered.find((entry) => entry.rowId === ui.selectedRowId) || filtered[0] || null;
+
+      patchText(storeView.querySelector('[data-store-stat="kind"]'), store.kindLabel);
+      patchText(storeView.querySelector('[data-store-stat="slots"]'), `${store.slotCount} slots`);
+      patchText(storeView.querySelector('[data-store-stat="active"]'), `${store.nonEmptyEntries.length} active paths`);
+
+      const storeBody = storeView.querySelector("[data-store-body]");
+      const storeDetail = storeView.querySelector("[data-store-detail]");
+      if (!storeBody || !storeDetail) {
+        return false;
+      }
+
+      storeBody.innerHTML = renderStoreRows(filtered, selectedEntry, state.snapshot.width);
+      storeDetail.innerHTML = renderStoreDetail(selectedEntry, state.snapshot.width);
+      bindStoreRowSelection(store.name);
+      return true;
+    }
+
+    function patchText(element, value) {
+      if (!element) {
+        return;
+      }
+      element.textContent = value;
+    }
+
+    function setTimelineFrame(index) {
+      if (!state.timeline) {
+        return;
+      }
+      stopTimelinePlayback();
+      const nextIndex = clamp(index, 0, state.timeline.frames.length - 1);
+      state.timeline.currentIndex = nextIndex;
+      state.snapshot = state.timeline.frames[nextIndex];
+      renderFrameChange();
+    }
+
+    function syncTimelinePlayback() {
+      if (!state.timeline) {
+        return;
+      }
+
+      if (state.timeline.timerId !== null) {
+        window.clearInterval(state.timeline.timerId);
+        state.timeline.timerId = null;
+      }
+
+      if (!state.timeline.isPlaying) {
+        return;
+      }
+
+      state.timeline.timerId = window.setInterval(() => {
+        if (!state.timeline) {
+          return;
+        }
+
+        const lastIndex = state.timeline.frames.length - 1;
+        if (state.timeline.currentIndex >= lastIndex) {
+          if (!state.timeline.loop) {
+            stopTimelinePlayback();
+            renderFrameChange();
+            return;
+          }
+          state.timeline.currentIndex = 0;
+        } else {
+          state.timeline.currentIndex += 1;
+        }
+
+        state.snapshot = state.timeline.frames[state.timeline.currentIndex];
+        renderFrameChange();
+      }, state.timeline.playbackMs);
+    }
+
+    function stopTimelinePlayback() {
+      if (!state.timeline) {
+        return;
+      }
+      state.timeline.isPlaying = false;
+      if (state.timeline.timerId !== null) {
+        window.clearInterval(state.timeline.timerId);
+        state.timeline.timerId = null;
+      }
+    }
+
+    function resetUiCaches() {
+      state.mapUi = null;
+      state.tableUi = {};
+      state.layerUi = {};
+      state.storeUi = {};
+      state.frameUi = null;
+    }
+
+    function normalizeViewForSnapshot() {
+      const snapshot = state.snapshot;
+      if (!snapshot) {
+        state.view = { type: "summary" };
+        return;
+      }
+
+      if (state.view.type === "table" && !snapshot.tables.some((table) => table.name === state.view.name)) {
+        state.view = { type: "summary" };
+      } else if (state.view.type === "layer" && !snapshot.layers.some((layer) => layer.name === state.view.name)) {
+        state.view = { type: "summary" };
+      } else if (state.view.type === "store" && !snapshot.stores.some((store) => store.name === state.view.name)) {
+        state.view = { type: "summary" };
+      }
+    }
+
+    function finalizeTimelineFrames(frames) {
+      const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+      const sorted = [...frames].sort((left, right) => {
+        if (left.tick < right.tick) return -1;
+        if (left.tick > right.tick) return 1;
+        return collator.compare(left.fileName, right.fileName);
+      });
+      const hasTickSequence = sorted.some((frame) => /^tick-\d+\.dmap$/i.test(baseName(frame.fileName)));
+      const finalized = hasTickSequence
+        ? sorted.filter((frame) => baseName(frame.fileName).toLowerCase() !== "latest.dmap")
+        : sorted;
+      for (let index = 0; index < finalized.length; index++) {
+        finalized[index].stateMatchesPrevious = index > 0 && finalized[index].stateHashHex === finalized[index - 1].stateHashHex;
+      }
+      return finalized;
+    }
+
+    function describeFileSetSource(files) {
+      const fileWithPath = files.find((file) => file.webkitRelativePath);
+      if (fileWithPath && fileWithPath.webkitRelativePath) {
+        return fileWithPath.webkitRelativePath.split("/")[0] || "Selected folder";
+      }
+      return files.length === 1 ? files[0].name : `${files.length} dropped files`;
+    }
+
+    function isSnapshotFile(fileName) {
+      return /\.dmap$/i.test(fileName);
+    }
+
+    function summarizeByteArray(values, cellCount) {
+      let min = 255;
+      let max = 0;
+      let nonZero = 0;
+      for (let i = 0; i < cellCount && i < values.length; i++) {
+        const value = values[i];
+        if (value < min) min = value;
+        if (value > max) max = value;
+        if (value !== 0) nonZero++;
+      }
+      return { min, max, nonZero };
+    }
+
+    function summarizeIntArray(values, cellCount) {
+      let min = Number.POSITIVE_INFINITY;
+      let max = Number.NEGATIVE_INFINITY;
+      for (let i = 0; i < cellCount && i < values.length; i++) {
+        const value = values[i];
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+      return {
+        min: Number.isFinite(min) ? min : 0,
+        max: Number.isFinite(max) ? max : 0,
+      };
+    }
+
+    function summarizeFix64Array(values, cellCount) {
+      let min = LONG_MAX;
+      let max = -LONG_MAX;
+      for (let i = 0; i < cellCount && i < values.length; i++) {
+        const value = values[i];
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+      return { min, max };
+    }
+
+    function findArrayMax(values) {
+      let max = 0;
+      for (let i = 0; i < values.length; i++) {
+        if (values[i] > max) {
+          max = values[i];
+        }
+      }
+      return max;
+    }
+
+    function readBit(words, cellIndex) {
+      const wordIndex = cellIndex >> 6;
+      const bitIndex = BigInt(cellIndex & 63);
+      return wordIndex < words.length && ((words[wordIndex] >> bitIndex) & 1n) === 1n;
+    }
+
+    function colorRamp(t, start, end) {
+      const clamped = clamp(t, 0, 1);
+      return [
+        Math.round(start[0] + (end[0] - start[0]) * clamped),
+        Math.round(start[1] + (end[1] - start[1]) * clamped),
+        Math.round(start[2] + (end[2] - start[2]) * clamped),
+      ];
+    }
+
+    function colorRampBigInt(t, start, end) {
+      return colorRamp(Number(t), start, end);
+    }
+
+    function normalize(value, min, max) {
+      if (max === min) return 0;
+      return (value - min) / (max - min);
+    }
+
+    function normalizeBigInt(value, min, max) {
+      if (max === min) return 0;
+      const numerator = Number(value - min);
+      const denominator = Number(max - min);
+      if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) return 0;
+      return numerator / denominator;
+    }
+
+    function formatFix64(rawValue) {
+      if (rawValue === LONG_MAX) {
+        return "Infinity sentinel";
+      }
+      const negative = rawValue < 0n;
+      const absValue = negative ? -rawValue : rawValue;
+      const whole = absValue / FIX64_SCALE;
+      const fraction = absValue % FIX64_SCALE;
+      return `${negative ? "-" : ""}${whole}.${fraction.toString().padStart(2, "0")}`;
+    }
+
+    function formatBigInt(value) {
+      return value.toString();
+    }
+
+    function formatShortStateHash(value) {
+      if (!value) {
+        return "Computing...";
+      }
+      return value.length > 16 ? `${value.slice(0, 16)}…` : value;
+    }
+
+    function describeStateChange(snapshot, isFirstFrame) {
+      if (!snapshot || !snapshot.stateHashHex) {
+        return "Computing state hash";
+      }
+      if (isFirstFrame) {
+        return "Reference frame";
+      }
+      return snapshot.stateMatchesPrevious ? "Same as previous frame" : "Changed from previous frame";
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, Number(value)));
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+
+    async function computeSnapshotStateHashHex(buffer, tickOffset, stateEndOffset) {
+      const bytes = new Uint8Array(buffer.slice(0, stateEndOffset));
+      for (let i = 0; i < 8; i++) {
+        bytes[tickOffset + i] = 0;
+      }
+
+      if (globalThis.crypto && globalThis.crypto.subtle) {
+        const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+        return bytesToHex(new Uint8Array(digest));
+      }
+
+      return computeFnv1a64Hex(bytes);
+    }
+
+    function bytesToHex(bytes) {
+      return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+    }
+
+    function computeFnv1a64Hex(bytes) {
+      let hash = 0xcbf29ce484222325n;
+      const prime = 0x100000001b3n;
+      const mask = 0xffffffffffffffffn;
+      for (const value of bytes) {
+        hash ^= BigInt(value);
+        hash = (hash * prime) & mask;
+      }
+      return hash.toString(16).padStart(16, "0");
+    }
+
+    function baseName(path) {
+      const parts = String(path).split(/[\\/]/);
+      return parts[parts.length - 1] || path;
+    }
+
+    class BinaryCursor {
+      constructor(buffer) {
+        this.buffer = buffer;
+        this.view = new DataView(buffer);
+        this.offset = 0;
+        this.decoder = new TextDecoder("utf-8");
+      }
+
+      readByte() {
+        const value = this.view.getUint8(this.offset);
+        this.offset += 1;
+        return value;
+      }
+
+      readBoolean() {
+        return this.readByte() !== 0;
+      }
+
+      readUInt16() {
+        const value = this.view.getUint16(this.offset, true);
+        this.offset += 2;
+        return value;
+      }
+
+      readInt32() {
+        const value = this.view.getInt32(this.offset, true);
+        this.offset += 4;
+        return value;
+      }
+
+      readUInt64() {
+        const value = this.view.getBigUint64(this.offset, true);
+        this.offset += 8;
+        return value;
+      }
+
+      readInt64() {
+        const value = this.view.getBigInt64(this.offset, true);
+        this.offset += 8;
+        return value;
+      }
+
+      readString() {
+        const byteLength = this.read7BitEncodedInt();
+        const bytes = new Uint8Array(this.buffer, this.offset, byteLength);
+        this.offset += byteLength;
+        return this.decoder.decode(bytes);
+      }
+
+      read7BitEncodedInt() {
+        let count = 0;
+        let shift = 0;
+        let byte = 0;
+        do {
+          byte = this.readByte();
+          count |= (byte & 0x7f) << shift;
+          shift += 7;
+        } while ((byte & 0x80) !== 0);
+        return count;
+      }
+
+      readUint8Array(length) {
+        const bytes = new Uint8Array(this.buffer.slice(this.offset, this.offset + length));
+        this.offset += length;
+        return bytes;
+      }
+
+      readInt32Array(length) {
+        const values = new Int32Array(length);
+        for (let i = 0; i < length; i++) {
+          values[i] = this.readInt32();
+        }
+        return values;
+      }
+
+      readInt64Array(length) {
+        const values = new Array(length);
+        for (let i = 0; i < length; i++) {
+          values[i] = this.readInt64();
+        }
+        return values;
+      }
+
+      readUInt64Array(length) {
+        const values = new Array(length);
+        for (let i = 0; i < length; i++) {
+          values[i] = this.readUInt64();
+        }
+        return values;
+      }
+
+      isAtEnd() {
+        return this.offset === this.buffer.byteLength;
+      }
+
+      remainingBytes() {
+        return this.buffer.byteLength - this.offset;
+      }
+    }
+
+    window.DetMapInspector = {
+      parseSnapshot,
+      computeSnapshotStateHashHex,
+      finalizeTimelineFrames,
+      describeFileSetSource,
+      isSnapshotFile,
+    };
+  </script>
+</body>
+</html>

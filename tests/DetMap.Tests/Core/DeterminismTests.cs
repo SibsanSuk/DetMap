@@ -1,8 +1,8 @@
 using DetMath;
-using DetMap.Building;
 using DetMap.Core;
 using DetMap.Layers;
 using DetMap.Pathfinding;
+using DetMap.Spatial;
 using DetMap.Tables;
 
 namespace DetMap.Tests.Core;
@@ -18,11 +18,11 @@ public class DeterminismTests
     {
         var map = new DetSpatialDatabase(32, 32);
 
-        var building = map.Grid.CreateIntLayer("building");
-        var height   = map.Grid.CreateFix64Layer("height");
-        var walkable = map.Grid.CreateBitLayer("walkable");
-        var units    = map.Grid.CreateCellIndex("units");
-        var services = map.Grid.CreateTagLayer("services");
+        var placements = map.Grid.CreateIntLayer("placements");
+        var height     = map.Grid.CreateFix64Layer("height");
+        var walkable   = map.Grid.CreateBitLayer("walkable");
+        var units      = map.Grid.CreateCellIndex("units");
+        var services   = map.Grid.CreateTagLayer("services");
 
         walkable.SetAll(true);
 
@@ -34,11 +34,11 @@ public class DeterminismTests
         var jobCol  = chars.CreateByteColumn("job");
         var pathStore = map.CreatePathStore("unitPaths");
 
-        // Place buildings
-        var house  = new BuildingDefinition("house",  2, 2, 1);
-        var market = new BuildingDefinition("market", 3, 2, 2);
-        BuildingPlacer.Place(map.Grid, 0,  0, house,  building, walkable);
-        BuildingPlacer.Place(map.Grid, 10, 5, market, building, walkable);
+        // Place spatial footprints
+        var house  = new SpatialDefinition("house",  2, 2, 1);
+        var market = new SpatialDefinition("market", 3, 2, 2);
+        SpatialPlacer.Place(map.Grid, 0,  0, house,  placements, walkable);
+        SpatialPlacer.Place(map.Grid, 10, 5, market, placements, walkable);
 
         // Set height data
         for (int y = 0; y < 8; y++)
@@ -69,7 +69,7 @@ public class DeterminismTests
 
         for (int tick = 0; tick < 5; tick++)
         {
-            map.AdvanceTick();
+            map.AdvanceFrame();
 
             for (int id = 0; id < 8; id++)
             {
@@ -105,12 +105,12 @@ public class DeterminismTests
     }
 
     [Fact]
-    public void SimulationBuildingLayer_SameInputTwice_IdenticalGrid()
+    public void SimulationPlacementLayer_SameInputTwice_IdenticalGrid()
     {
         var map1 = BuildAndSimulate();
         var map2 = BuildAndSimulate();
-        var b1 = map1.Grid.GetIntLayer("building");
-        var b2 = map2.Grid.GetIntLayer("building");
+        var b1 = map1.Grid.GetIntLayer("placements");
+        var b2 = map2.Grid.GetIntLayer("placements");
         for (int y = 0; y < 32; y++)
         for (int x = 0; x < 32; x++)
             Assert.Equal(b1.Get(x, y), b2.Get(x, y));

@@ -259,7 +259,7 @@ Recommended rules:
 
 This keeps the runtime predictable and makes tooling trustworthy.
 
-In practice, this means tooling should stage a `DetCommandBatch` rather than mutating live state directly.
+In practice, this means tooling should stage a `DetDbCommandList` rather than mutating live state directly.
 
 For generic tools, the database should also expose schema metadata directly.
 

@@ -90,6 +90,9 @@ type ViewerTable = {
 type ViewerColumn = {
   name: string;
   kind: string;
+  isDerived: boolean;
+  source: string;
+  isEditable: boolean;
 };
 
 type ViewerRow = {
@@ -198,6 +201,7 @@ Show globals in a simple key/value table.
 For each table:
 
 - list columns and kinds
+- show derived/read-only/source metadata when present
 - list rows
 - allow filtering by row id
 - allow text search over visible values
@@ -284,7 +288,7 @@ Do not mix multiple snapshot versions into one loose parser with hidden assumpti
 A phase-1 viewer is successful if it can:
 
 - open a `.dmap` file
-- parse `DetSnapshot` version 2
+- parse `DetSnapshot` versions 2 and 3
 - render globals
 - render tables and rows
 - render layer metadata and coordinate inspection
@@ -301,7 +305,7 @@ Possible later phases:
 - table diff between two snapshots
 - snapshot compare by tick
 - export to JSON for analysis
-- staged edits via `DetCommandBatch`
+- staged edits via `DetDbCommandList`
 - realtime integration through a local web server
 
 These should stay secondary until the offline snapshot viewer is solid.

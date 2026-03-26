@@ -35,6 +35,31 @@ public sealed class DetPathStore
             _paths[rowId] = default;
     }
 
+    public void CopyFrom(DetPathStore source)
+    {
+        if (_paths.Length != source._paths.Length)
+            _paths = new DetPath[source._paths.Length];
+
+        for (int i = 0; i < source._paths.Length; i++)
+        {
+            DetPath sourcePath = source._paths[i];
+            if (sourcePath.Length <= 0 || sourcePath.Steps is null)
+            {
+                _paths[i] = default;
+                continue;
+            }
+
+            var steps = new int[sourcePath.Length];
+            Array.Copy(sourcePath.Steps, steps, sourcePath.Length);
+            _paths[i] = new DetPath
+            {
+                Steps = steps,
+                Length = sourcePath.Length,
+                CurrentStep = sourcePath.CurrentStep,
+            };
+        }
+    }
+
     private void EnsureCapacity(int rowId)
     {
         if (rowId >= _paths.Length)

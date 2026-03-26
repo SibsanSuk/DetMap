@@ -114,6 +114,64 @@ public sealed class DetGrid
         return schemas;
     }
 
+    internal bool HasCompatibleStructure(DetGrid source)
+    {
+        if (Width != source.Width || Height != source.Height)
+            return false;
+        if (_layerOrder.Count != source._layerOrder.Count)
+            return false;
+
+        for (int i = 0; i < _layerOrder.Count; i++)
+        {
+            string name = _layerOrder[i];
+            if (!string.Equals(name, source._layerOrder[i], StringComparison.Ordinal))
+                return false;
+            if (_layers[name].Kind != source._layers[name].Kind)
+                return false;
+        }
+
+        return true;
+    }
+
+    internal void CopyFrom(DetGrid source)
+    {
+        if (!HasCompatibleStructure(source))
+            throw new InvalidOperationException("Cannot copy from a grid with a different schema.");
+
+        foreach (string name in _layerOrder)
+        {
+            IDetLayer destinationLayer = _layers[name];
+            IDetLayer sourceLayer = source._layers[name];
+
+            switch (destinationLayer)
+            {
+                case DetValueLayer<byte> destination when sourceLayer is DetValueLayer<byte> sourceValue:
+                    destination.CopyFrom(sourceValue);
+                    break;
+                case DetValueLayer<int> destination when sourceLayer is DetValueLayer<int> sourceValue:
+                    destination.CopyFrom(sourceValue);
+                    break;
+                case DetValueLayer<Fix64> destination when sourceLayer is DetValueLayer<Fix64> sourceValue:
+                    destination.CopyFrom(sourceValue);
+                    break;
+                case DetBitLayer destination when sourceLayer is DetBitLayer sourceBit:
+                    destination.CopyFrom(sourceBit);
+                    break;
+                case DetCellIndex destination when sourceLayer is DetCellIndex sourceIndex:
+                    destination.CopyFrom(sourceIndex);
+                    break;
+                case DetTagLayer destination when sourceLayer is DetTagLayer sourceTag:
+                    destination.CopyFrom(sourceTag);
+                    break;
+                case DetFlowLayer destination when sourceLayer is DetFlowLayer sourceFlow:
+                    destination.CopyFrom(sourceFlow);
+                    break;
+                default:
+                    throw new NotSupportedException($"Layer copy is not supported for '{name}' ({destinationLayer.GetType().Name}).");
+            }
+        }
+    }
+
     private void AddLayerName(string name)
     {
         if (!_layerOrder.Contains(name))

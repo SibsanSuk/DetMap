@@ -20,7 +20,7 @@ public static class DetType
     /// <summary>8-bit unsigned integer. Use for flags, zone type, unit count (0–255).</summary>
     public static readonly DetType<byte> Byte = new();
 
-    /// <summary>32-bit signed integer. Use for building ID, terrain type.</summary>
+    /// <summary>32-bit signed integer. Use for placement type, terrain type, row id.</summary>
     public static readonly DetType<int> Int = new();
 
     /// <summary>Deterministic fixed-point (DetMath.Fix64). Use for height, resource amount, cost.</summary>

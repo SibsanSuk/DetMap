@@ -1,16 +1,13 @@
-using DetMath;
-
 namespace DetMap.Query;
 
 public readonly struct CellHit
 {
-    public readonly int X, Y;
-    public readonly Fix64 Value;
+    public readonly int X;
+    public readonly int Y;
 
-    public CellHit(int x, int y, Fix64 value = default)
+    public CellHit(int x, int y)
     {
         X = x;
         Y = y;
-        Value = value;
     }
 }

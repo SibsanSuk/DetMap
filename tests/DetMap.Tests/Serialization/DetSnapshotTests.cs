@@ -1,8 +1,10 @@
 using DetMath;
-using DetMap.Building;
 using DetMap.Core;
+using DetMap.DbCommands;
 using DetMap.Layers;
 using DetMap.Pathfinding;
+using DetMap.Schema;
+using DetMap.Serialization;
 using DetMap.Tables;
 
 namespace DetMap.Tests.Serialization;
@@ -45,20 +47,27 @@ public class DetSnapshotTests
         var hpCol   = chars.CreateIntColumn("hp");
         var lvlCol  = chars.CreateByteColumn("level");
         var xpCol   = chars.CreateFix64Column("xp");
+        var summaryCol = chars.CreateStringColumn("summary", DetColumnOptions.Derived("name,hp"));
+        var levelIndex = chars.CreateByteIndex("heroesByLevel", lvlCol);
+        var xpIndex = chars.CreateFix64Index("heroesByXp", xpCol);
 
         int id0 = chars.CreateRow();
         nameCol.Set(id0, "Alice");
         hpCol.Set(id0, 100);
         lvlCol.Set(id0, 5);
         xpCol.Set(id0, Fix64.FromInt(1234));
+        summaryCol.Set(id0, "Alice hp=100");
 
         int id1 = chars.CreateRow();
         nameCol.Set(id1, "Bob");
         hpCol.Set(id1, 80);
         lvlCol.Set(id1, 3);
         xpCol.Set(id1, Fix64.FromInt(500));
+        summaryCol.Set(id1, "Bob hp=80");
 
         chars.DeleteRow(id0); // creates a free-list entry
+        Assert.Equal(1, levelIndex.Count(3));
+        Assert.Equal(1, xpIndex.Count(Fix64.FromInt(500)));
 
         // path store
         var walkable2 = map.Grid.GetBitLayer("walkable");
@@ -71,9 +80,9 @@ public class DetSnapshotTests
         p0.Advance(); // currentStep = 2
 
         // advance tick
-        map.AdvanceTick();
-        map.AdvanceTick();
-        map.AdvanceTick();
+        map.AdvanceFrame();
+        map.AdvanceFrame();
+        map.AdvanceFrame();
 
         return map;
     }
@@ -86,6 +95,25 @@ public class DetSnapshotTests
         var map = BuildFullMap();
         var map2 = DetSpatialDatabase.FromBytes(map.ToBytes());
         Assert.Equal(map.Tick, map2.Tick);
+    }
+
+    [Fact]
+    public void RoundTrip_FromBytes_IgnoresOptionalDbFrameRecord()
+    {
+        var map = BuildFullMap();
+        var commands = new DetDbCommandList();
+        var frameRecord = DetDbFrameRecord.Create(
+            map.Tick,
+            map.ComputeStateHashHex(),
+            map.ComputeFrameHashHex(),
+            commands);
+
+        byte[] bytes = DetSnapshot.Serialize(map, frameRecord);
+        var restored = DetSpatialDatabase.FromBytes(bytes);
+
+        Assert.Equal(map.Tick, restored.Tick);
+        Assert.Equal(map.ComputeStateHashHex(), restored.ComputeStateHashHex());
+        Assert.Equal(map.GetTable("heroes").HighWater, restored.GetTable("heroes").HighWater);
     }
 
     // ── globals ───────────────────────────────────────────────────────────────
@@ -246,6 +274,50 @@ public class DetSnapshotTests
         var xpCol1 = map.GetTable("heroes").GetFix64Column("xp");
         var xpCol2 = map2.GetTable("heroes").GetFix64Column("xp");
         Assert.Equal(xpCol1.Get(1).RawValue, xpCol2.Get(1).RawValue);
+    }
+
+    [Fact]
+    public void RoundTrip_Table_DerivedColumnMetadata_Preserved()
+    {
+        var map = BuildFullMap();
+        var map2 = DetSpatialDatabase.FromBytes(map.ToBytes());
+
+        var summarySchema = map2.GetTable("heroes").GetSchema().Columns.Single(column => column.Name == "summary");
+
+        Assert.True(summarySchema.IsDerived);
+        Assert.Equal("name,hp", summarySchema.Source);
+        Assert.False(summarySchema.IsEditable);
+    }
+
+    [Fact]
+    public void RoundTrip_Table_ColumnIndexSchema_Preserved()
+    {
+        var map = BuildFullMap();
+        var map2 = DetSpatialDatabase.FromBytes(map.ToBytes());
+
+        var tableSchema = map2.GetTable("heroes").GetSchema();
+        var levelIndex = tableSchema.Indexes.Single(index => index.Name == "heroesByLevel");
+        var xpIndex = tableSchema.Indexes.Single(index => index.Name == "heroesByXp");
+
+        Assert.Equal(DetColumnKind.Byte, levelIndex.Kind);
+        Assert.Equal("level", levelIndex.ColumnName);
+        Assert.Equal(DetColumnKind.Fix64, xpIndex.Kind);
+        Assert.Equal("xp", xpIndex.ColumnName);
+    }
+
+    [Fact]
+    public void RoundTrip_Table_ColumnIndexes_RebuiltFromAliveRows()
+    {
+        var map = BuildFullMap();
+        var map2 = DetSpatialDatabase.FromBytes(map.ToBytes());
+
+        var byLevel = map2.GetTable("heroes").GetByteIndex("heroesByLevel");
+        var byXp = map2.GetTable("heroes").GetFix64Index("heroesByXp");
+
+        Assert.Equal(new[] { 1 }, byLevel.GetRowIds(3).ToArray());
+        Assert.Empty(byLevel.GetRowIds(5));
+        Assert.Equal(new[] { 1 }, byXp.GetRowIds(Fix64.FromInt(500)).ToArray());
+        Assert.Empty(byXp.GetRowIds(Fix64.FromInt(1234)));
     }
 
     // ── error handling ────────────────────────────────────────────────────────

@@ -46,6 +46,15 @@ public sealed class DetBitLayer : IDetLayer, IDetReadable<bool>
         Array.Fill(_bits, fill);
     }
 
+    public void CopyFrom(DetBitLayer source)
+    {
+        if (source._width != _width || source._height != _height || source._bits.Length != _bits.Length)
+            throw new InvalidOperationException($"Cannot copy layer '{source.Name}' into '{Name}' with different dimensions.");
+
+        Array.Copy(source._bits, _bits, _bits.Length);
+        Dirty = default;
+    }
+
     public static void And(DetBitLayer a, DetBitLayer b, DetBitLayer result)
     {
         for (int i = 0; i < result._bits.Length; i++)

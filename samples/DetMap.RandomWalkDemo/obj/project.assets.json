@@ -1,0 +1,95 @@
+{
+  "version": 3,
+  "targets": {
+    "net9.0": {
+      "DetMap/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.1",
+        "compile": {
+          "bin/placeholder/DetMap.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/DetMap.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "DetMap/1.0.0": {
+      "type": "project",
+      "path": "../../src/DetMap/DetMap.csproj",
+      "msbuildProject": "../../src/DetMap/DetMap.csproj"
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net9.0": [
+      "DetMap >= 1.0.0"
+    ]
+  },
+  "packageFolders": {
+    "/Users/sibsan/.nuget/packages/": {}
+  },
+  "project": {
+    "version": "1.0.0",
+    "restore": {
+      "projectUniqueName": "/Users/sibsan/GitHub/DetMap/samples/DetMap.RandomWalkDemo/DetMap.RandomWalkDemo.csproj",
+      "projectName": "DetMap.RandomWalkDemo",
+      "projectPath": "/Users/sibsan/GitHub/DetMap/samples/DetMap.RandomWalkDemo/DetMap.RandomWalkDemo.csproj",
+      "packagesPath": "/Users/sibsan/.nuget/packages/",
+      "outputPath": "/Users/sibsan/GitHub/DetMap/samples/DetMap.RandomWalkDemo/obj/",
+      "projectStyle": "PackageReference",
+      "configFilePaths": [
+        "/Users/sibsan/.nuget/NuGet/NuGet.Config"
+      ],
+      "originalTargetFrameworks": [
+        "net9.0"
+      ],
+      "sources": {
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "net9.0": {
+          "targetAlias": "net9.0",
+          "projectReferences": {
+            "/Users/sibsan/GitHub/DetMap/src/DetMap/DetMap.csproj": {
+              "projectPath": "/Users/sibsan/GitHub/DetMap/src/DetMap/DetMap.csproj"
+            }
+          }
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
+      },
+      "SdkAnalysisLevel": "9.0.300"
+    },
+    "frameworks": {
+      "net9.0": {
+        "targetAlias": "net9.0",
+        "imports": [
+          "net461",
+          "net462",
+          "net47",
+          "net471",
+          "net472",
+          "net48",
+          "net481"
+        ],
+        "assetTargetFallback": true,
+        "warn": true,
+        "frameworkReferences": {
+          "Microsoft.NETCore.App": {
+            "privateAssets": "all"
+          }
+        },
+        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.306/PortableRuntimeIdentifierGraph.json"
+      }
+    }
+  }
+}

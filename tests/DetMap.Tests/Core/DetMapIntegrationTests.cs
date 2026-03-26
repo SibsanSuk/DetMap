@@ -1,8 +1,8 @@
 using DetMath;
-using DetMap.Building;
 using DetMap.Core;
 using DetMap.Layers;
 using DetMap.Pathfinding;
+using DetMap.Spatial;
 using DetMap.Tables;
 
 namespace DetMap.Tests.Core;
@@ -15,7 +15,7 @@ public class DetMapIntegrationTests
     {
         var map = new DetSpatialDatabase(64, 64);
 
-        var building = map.Grid.CreateIntLayer("building");
+        var placements = map.Grid.CreateIntLayer("placements");
         var walkable = map.Grid.CreateBitLayer("walkable");
         walkable.SetAll(true);
 
@@ -36,20 +36,20 @@ public class DetMapIntegrationTests
         Assert.Equal(1, units.CountAt(10, 10));
 
         // Place temple
-        var temple = new BuildingDefinition("temple", 3, 3, 2);
-        Assert.True(BuildingPlacer.CanPlace(map.Grid, 20, 20, temple, building, walkable));
-        BuildingPlacer.Place(map.Grid, 20, 20, temple, building, walkable);
-        Assert.Equal(2, building.Get(20, 20));
+        var temple = new SpatialDefinition("temple", 3, 3, 2);
+        Assert.True(SpatialPlacer.CanPlace(map.Grid, 20, 20, temple, placements, walkable));
+        SpatialPlacer.Place(map.Grid, 20, 20, temple, placements, walkable);
+        Assert.Equal(2, placements.Get(20, 20));
         Assert.False(walkable.Get(20, 20));
 
-        // Pathfind around building
+        // Pathfind around placed footprint
         var pf = new DetPathfinder(64, 64);
         var path = pf.FindPath(10, 10, 25, 25, walkable);
         Assert.True(path.IsValid);
         paths.Set(somchai, path);
 
         // Simulate tick
-        map.AdvanceTick();
+        map.AdvanceFrame();
         Assert.Equal(1UL, map.Tick);
 
         ref DetPath p = ref paths.Get(somchai);
@@ -73,12 +73,12 @@ public class DetMapIntegrationTests
     }
 
     [Fact]
-    public void AdvanceTick_IncrementsTick()
+    public void AdvanceFrame_IncrementsTick()
     {
         var map = new DetSpatialDatabase(16, 16);
         Assert.Equal(0UL, map.Tick);
-        map.AdvanceTick();
-        map.AdvanceTick();
+        map.AdvanceFrame();
+        map.AdvanceFrame();
         Assert.Equal(2UL, map.Tick);
     }
 }

@@ -3,9 +3,9 @@ using DetMap.Core;
 using DetMap.Layers;
 using DetMap.Tables;
 
-namespace DetMap.Commands;
+namespace DetMap.DbCommands;
 
-public enum DetCommandKind : byte
+public enum DetDbCommandKind : byte
 {
     SetGlobalFix64 = 0,
     CreateRow = 1,
@@ -23,18 +23,18 @@ public enum DetCommandKind : byte
     RemoveRow = 13,
 }
 
-public interface IDetCommand
+public interface IDetDbCommand
 {
-    DetCommandKind Kind { get; }
+    DetDbCommandKind Kind { get; }
     void ApplyTo(DetSpatialDatabase database);
 }
 
-public sealed class DetCommandBatch
+public sealed class DetDbCommandList
 {
-    private readonly List<IDetCommand> _commands = new();
+    private readonly List<IDetDbCommand> _commands = new();
 
     public int Count => _commands.Count;
-    public IReadOnlyList<IDetCommand> Commands => _commands;
+    public IReadOnlyList<IDetDbCommand> Commands => _commands;
 
     public void SetGlobal(string key, Fix64 value)
         => _commands.Add(new SetGlobalFix64Command(key, value));
@@ -78,18 +78,67 @@ public sealed class DetCommandBatch
     public void RemoveRow(string indexName, int rowId)
         => _commands.Add(new RemoveRowCommand(indexName, rowId));
 
-    public void ApplyTo(DetSpatialDatabase database)
+    public DetDbChangeSummary BuildSummary()
     {
+        var builder = new DetDbChangeSummaryBuilder();
         foreach (var command in _commands)
-            command.ApplyTo(database);
+        {
+            switch (command)
+            {
+                case SetGlobalFix64Command c:
+                    builder.AddGlobal(c.Key);
+                    break;
+                case CreateRowCommand c:
+                    builder.AddCreateRow(c.TableName, c.ExpectedRowId);
+                    break;
+                case DeleteRowCommand c:
+                    builder.AddDeleteRow(c.TableName, c.RowId);
+                    break;
+                case SetByteColumnCommand c:
+                    builder.AddColumnWrite(c.TableName, c.ColumnName, c.RowId);
+                    break;
+                case SetIntColumnCommand c:
+                    builder.AddColumnWrite(c.TableName, c.ColumnName, c.RowId);
+                    break;
+                case SetFix64ColumnCommand c:
+                    builder.AddColumnWrite(c.TableName, c.ColumnName, c.RowId);
+                    break;
+                case SetStringColumnCommand c:
+                    builder.AddColumnWrite(c.TableName, c.ColumnName, c.RowId);
+                    break;
+                case SetBitCellCommand c:
+                    builder.AddLayerWrite(c.LayerName, c.X, c.Y);
+                    break;
+                case SetByteCellCommand c:
+                    builder.AddLayerWrite(c.LayerName, c.X, c.Y);
+                    break;
+                case SetIntCellCommand c:
+                    builder.AddLayerWrite(c.LayerName, c.X, c.Y);
+                    break;
+                case SetFix64CellCommand c:
+                    builder.AddLayerWrite(c.LayerName, c.X, c.Y);
+                    break;
+                case PlaceRowCommand c:
+                    builder.AddIndexWrite(c.IndexName, c.RowId, c.X, c.Y);
+                    break;
+                case MoveRowCommand c:
+                    builder.AddIndexWrite(c.IndexName, c.RowId, c.X, c.Y);
+                    break;
+                case RemoveRowCommand c:
+                    builder.AddIndexWrite(c.IndexName, c.RowId, null, null);
+                    break;
+            }
+        }
+
+        return builder.Build(_commands.Count);
     }
 
     public void Clear() => _commands.Clear();
 }
 
-public sealed class SetGlobalFix64Command : IDetCommand
+public sealed class SetGlobalFix64Command : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.SetGlobalFix64;
+    public DetDbCommandKind Kind => DetDbCommandKind.SetGlobalFix64;
     public string Key { get; }
     public Fix64 Value { get; }
 
@@ -103,9 +152,9 @@ public sealed class SetGlobalFix64Command : IDetCommand
         => database.SetGlobal(Key, Value);
 }
 
-public sealed class CreateRowCommand : IDetCommand
+public sealed class CreateRowCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.CreateRow;
+    public DetDbCommandKind Kind => DetDbCommandKind.CreateRow;
     public string TableName { get; }
     public int ExpectedRowId { get; }
 
@@ -123,9 +172,9 @@ public sealed class CreateRowCommand : IDetCommand
     }
 }
 
-public sealed class DeleteRowCommand : IDetCommand
+public sealed class DeleteRowCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.DeleteRow;
+    public DetDbCommandKind Kind => DetDbCommandKind.DeleteRow;
     public string TableName { get; }
     public int RowId { get; }
 
@@ -139,9 +188,9 @@ public sealed class DeleteRowCommand : IDetCommand
         => database.GetTable(TableName).DeleteRow(RowId);
 }
 
-public sealed class SetByteColumnCommand : IDetCommand
+public sealed class SetByteColumnCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.SetByteColumn;
+    public DetDbCommandKind Kind => DetDbCommandKind.SetByteColumn;
     private readonly string _tableName;
     private readonly string _columnName;
     private readonly int _rowId;
@@ -157,11 +206,16 @@ public sealed class SetByteColumnCommand : IDetCommand
 
     public void ApplyTo(DetSpatialDatabase database)
         => database.GetTable(_tableName).GetByteColumn(_columnName).Set(_rowId, _value);
+
+    public string TableName => _tableName;
+    public string ColumnName => _columnName;
+    public int RowId => _rowId;
+    public byte Value => _value;
 }
 
-public sealed class SetIntColumnCommand : IDetCommand
+public sealed class SetIntColumnCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.SetIntColumn;
+    public DetDbCommandKind Kind => DetDbCommandKind.SetIntColumn;
     private readonly string _tableName;
     private readonly string _columnName;
     private readonly int _rowId;
@@ -177,11 +231,16 @@ public sealed class SetIntColumnCommand : IDetCommand
 
     public void ApplyTo(DetSpatialDatabase database)
         => database.GetTable(_tableName).GetIntColumn(_columnName).Set(_rowId, _value);
+
+    public string TableName => _tableName;
+    public string ColumnName => _columnName;
+    public int RowId => _rowId;
+    public int Value => _value;
 }
 
-public sealed class SetFix64ColumnCommand : IDetCommand
+public sealed class SetFix64ColumnCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.SetFix64Column;
+    public DetDbCommandKind Kind => DetDbCommandKind.SetFix64Column;
     private readonly string _tableName;
     private readonly string _columnName;
     private readonly int _rowId;
@@ -197,11 +256,16 @@ public sealed class SetFix64ColumnCommand : IDetCommand
 
     public void ApplyTo(DetSpatialDatabase database)
         => database.GetTable(_tableName).GetFix64Column(_columnName).Set(_rowId, _value);
+
+    public string TableName => _tableName;
+    public string ColumnName => _columnName;
+    public int RowId => _rowId;
+    public Fix64 Value => _value;
 }
 
-public sealed class SetStringColumnCommand : IDetCommand
+public sealed class SetStringColumnCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.SetStringColumn;
+    public DetDbCommandKind Kind => DetDbCommandKind.SetStringColumn;
     private readonly string _tableName;
     private readonly string _columnName;
     private readonly int _rowId;
@@ -217,11 +281,16 @@ public sealed class SetStringColumnCommand : IDetCommand
 
     public void ApplyTo(DetSpatialDatabase database)
         => database.GetTable(_tableName).GetStringColumn(_columnName).Set(_rowId, _value);
+
+    public string TableName => _tableName;
+    public string ColumnName => _columnName;
+    public int RowId => _rowId;
+    public string? Value => _value;
 }
 
-public sealed class SetBitCellCommand : IDetCommand
+public sealed class SetBitCellCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.SetBitCell;
+    public DetDbCommandKind Kind => DetDbCommandKind.SetBitCell;
     private readonly string _layerName;
     private readonly int _x;
     private readonly int _y;
@@ -237,11 +306,16 @@ public sealed class SetBitCellCommand : IDetCommand
 
     public void ApplyTo(DetSpatialDatabase database)
         => database.Grid.GetBitLayer(_layerName).Set(_x, _y, _value);
+
+    public string LayerName => _layerName;
+    public int X => _x;
+    public int Y => _y;
+    public bool Value => _value;
 }
 
-public sealed class SetByteCellCommand : IDetCommand
+public sealed class SetByteCellCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.SetByteCell;
+    public DetDbCommandKind Kind => DetDbCommandKind.SetByteCell;
     private readonly string _layerName;
     private readonly int _x;
     private readonly int _y;
@@ -257,11 +331,16 @@ public sealed class SetByteCellCommand : IDetCommand
 
     public void ApplyTo(DetSpatialDatabase database)
         => database.Grid.GetByteLayer(_layerName).Set(_x, _y, _value);
+
+    public string LayerName => _layerName;
+    public int X => _x;
+    public int Y => _y;
+    public byte Value => _value;
 }
 
-public sealed class SetIntCellCommand : IDetCommand
+public sealed class SetIntCellCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.SetIntCell;
+    public DetDbCommandKind Kind => DetDbCommandKind.SetIntCell;
     private readonly string _layerName;
     private readonly int _x;
     private readonly int _y;
@@ -277,11 +356,16 @@ public sealed class SetIntCellCommand : IDetCommand
 
     public void ApplyTo(DetSpatialDatabase database)
         => database.Grid.GetIntLayer(_layerName).Set(_x, _y, _value);
+
+    public string LayerName => _layerName;
+    public int X => _x;
+    public int Y => _y;
+    public int Value => _value;
 }
 
-public sealed class SetFix64CellCommand : IDetCommand
+public sealed class SetFix64CellCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.SetFix64Cell;
+    public DetDbCommandKind Kind => DetDbCommandKind.SetFix64Cell;
     private readonly string _layerName;
     private readonly int _x;
     private readonly int _y;
@@ -297,11 +381,16 @@ public sealed class SetFix64CellCommand : IDetCommand
 
     public void ApplyTo(DetSpatialDatabase database)
         => database.Grid.GetFix64Layer(_layerName).Set(_x, _y, _value);
+
+    public string LayerName => _layerName;
+    public int X => _x;
+    public int Y => _y;
+    public Fix64 Value => _value;
 }
 
-public sealed class PlaceRowCommand : IDetCommand
+public sealed class PlaceRowCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.PlaceRow;
+    public DetDbCommandKind Kind => DetDbCommandKind.PlaceRow;
     private readonly string _indexName;
     private readonly int _rowId;
     private readonly int _x;
@@ -317,11 +406,16 @@ public sealed class PlaceRowCommand : IDetCommand
 
     public void ApplyTo(DetSpatialDatabase database)
         => database.Grid.GetCellIndex(_indexName).Place(_rowId, _x, _y);
+
+    public string IndexName => _indexName;
+    public int RowId => _rowId;
+    public int X => _x;
+    public int Y => _y;
 }
 
-public sealed class MoveRowCommand : IDetCommand
+public sealed class MoveRowCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.MoveRow;
+    public DetDbCommandKind Kind => DetDbCommandKind.MoveRow;
     private readonly string _indexName;
     private readonly int _rowId;
     private readonly int _x;
@@ -337,11 +431,16 @@ public sealed class MoveRowCommand : IDetCommand
 
     public void ApplyTo(DetSpatialDatabase database)
         => database.Grid.GetCellIndex(_indexName).MoveTo(_rowId, _x, _y);
+
+    public string IndexName => _indexName;
+    public int RowId => _rowId;
+    public int X => _x;
+    public int Y => _y;
 }
 
-public sealed class RemoveRowCommand : IDetCommand
+public sealed class RemoveRowCommand : IDetDbCommand
 {
-    public DetCommandKind Kind => DetCommandKind.RemoveRow;
+    public DetDbCommandKind Kind => DetDbCommandKind.RemoveRow;
     private readonly string _indexName;
     private readonly int _rowId;
 
@@ -353,4 +452,7 @@ public sealed class RemoveRowCommand : IDetCommand
 
     public void ApplyTo(DetSpatialDatabase database)
         => database.Grid.GetCellIndex(_indexName).Remove(_rowId);
+
+    public string IndexName => _indexName;
+    public int RowId => _rowId;
 }

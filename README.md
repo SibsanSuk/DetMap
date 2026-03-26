@@ -13,6 +13,7 @@ Simulation math uses **Fix64** fixed-point arithmetic, and database values are r
 - [Why DetMap](#why-detmap)
 - [Modeling Data](#modeling-data)
 - [Architecture](#architecture)
+- [Data Schema](#data-schema)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Layers](#layers)
@@ -25,9 +26,9 @@ Simulation math uses **Fix64** fixed-point arithmetic, and database values are r
   - [DetTable — column-oriented row store](#dettable--column-oriented-row-store)
 - [DetPathStore — path store](#detpathstore--path-store)
 - [Pathfinding](#pathfinding)
-- [Building System](#building-system)
+- [Spatial Placement](#spatial-placement)
 - [Query Engine](#query-engine)
-- [Command Batches](#command-batches)
+- [DB Command Lists](#db-command-lists)
 - [Save / Load (DetSnapshot)](#save--load-detsnapshot)
 - [Determinism Reference](#determinism-reference)
 - [Unity Integration](#unity-integration)
@@ -52,6 +53,7 @@ Use this rule of thumb:
 
 - `Layer`: data attached to cells. Examples: `height`, `terrainType`, `walkable`, `fertility`.
 - `Table`: sparse rows you want humans and systems to inspect. Examples: `units`, `buildings`, `resourceStacks`, `jobs`.
+- `Derived Column`: readable summary data generated from truth tables/columns. Examples: `storageSummary`, `layoutPreview`, `taskLabel`.
 - `CellIndex`: spatial lookup for table rows. Example: “which unit rows are in cell `(10,5)`?”
 - `PathStore`: derived movement payload keyed by row id. Example: the current A* path for a worker.
 - `DetSnapshot`: save/load boundary for debugging, replay, and offline inspection.
@@ -59,6 +61,7 @@ Use this rule of thumb:
 Typical modeling pattern:
 
 - Keep business truth in `Table` columns and `Layer` values.
+- Add derived columns when users need one table to read clearly without opening several related tables.
 - Add `CellIndex` when you need fast row-by-cell lookup.
 - Use `PathStore` for runtime path payload, not as your main business record.
 
@@ -67,7 +70,7 @@ Typical modeling pattern:
 ## Architecture
 
 ```text
-DetSpatialDatabase           ← top-level state database (tick, globals, tables)
+DetSpatialDatabase           ← top-level state database (tick, globals, tables, hidden 3-frame ring pool)
   └── DetGrid                ← holds all layers, exposes InBounds
         ├── DetValueLayer<T>    ← dense value grid  (byte / int / Fix64)
         ├── DetBitLayer      ← bit-packed boolean grid
@@ -82,15 +85,32 @@ DetTable                     ← column-oriented row store
 DetPathStore                 ← named path store (rowId → DetPath), serialized by DetSnapshot
 
 DetPathfinder                ← A* with Chebyshev heuristic + cell-index tie-breaking
-QueryEngine                  ← rect, radius, flood-fill queries (zero allocation via caller buffer)
-BuildingPlacer               ← place / remove / canPlace footprint on grid
+QueryEngine                  ← rect, radius, flood-fill queries via caller-supplied buffers
+SpatialPlacer                ← place / remove / canPlace footprint on grid
 DetSnapshot                  ← binary save/load with embedded schema
 ```
 
+DetMap now runs on a `current frame -> next frame -> commit` model inside `DetSpatialDatabase`.
+The frame pool is internal. Callers still use one database object and stage edits through `DetDbCommandList`.
+
 Architecture note: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+Schema note: [docs/SCHEMA.md](docs/SCHEMA.md)
 Snapshot viewer note: [docs/SNAPSHOT_VIEWER.md](docs/SNAPSHOT_VIEWER.md)
 
 **Dependency**: [DetMath](DetMath/DetMathREADME.md) — Q2.2 fixed-point library compiled as `DetMath.dll` (`netstandard2.0`).
+
+---
+
+## Data Schema
+
+For schema design, DetMap should be easy to learn with one simple rule:
+
+- definitions are tables
+- runtime records are tables
+- dense cell facts are layers
+- sidecar subsystem data is stored in stores
+
+Schema note: [docs/SCHEMA.md](docs/SCHEMA.md)
 
 ---
 
@@ -202,7 +222,7 @@ Span<Fix64> raw = height.AsSpan();
 DetValueLayer<int> ids2 = map.Grid.GetIntLayer("ids");
 
 // Low-level generic API is still available when a DetType token is useful
-DetValueLayer<int> building2 = map.Grid.CreateValueLayer("building", DetType.Int);
+DetValueLayer<int> placements2 = map.Grid.CreateValueLayer("placements", DetType.Int);
 ```
 
 **Allowed types only.** Trying to pass a custom type that is not `byte`, `int`, or `Fix64` will fail to compile because `DetType<T>` has an `internal` constructor:
@@ -360,6 +380,18 @@ DetColumn<int>  hp2   = t.GetIntColumn("hp");
 DetStringColumn name2 = t.GetStringColumn("name");
 ```
 
+Readable summary columns can be marked as derived:
+
+```csharp
+using DetMap.Schema;
+
+DetStringColumn storageSummary = chars.CreateStringColumn(
+    "storageSummary",
+    DetColumnOptions.Derived("spatialStorageCapacities"));
+```
+
+Use this for reading surfaces, not for source-of-truth state. Systems should update the source tables and regenerate the derived column.
+
 ---
 
 ## Schema / Inspection
@@ -376,7 +408,7 @@ foreach (var table in schema.Tables)
 {
     Debug.Log($"Table: {table.Name}");
     foreach (var column in table.Columns)
-        Debug.Log($"  {column.Name} : {column.Kind}");
+        Debug.Log($"  {column.Name} : {column.Kind} derived={column.IsDerived} source={column.Source}");
 }
 ```
 
@@ -386,29 +418,42 @@ The first practical tool can be a plain HTML page that loads a saved `DetSnapsho
 
 ---
 
-## Command Batches
+## DB Command Lists
 
-`DetCommandBatch` is the staging surface for lockstep input, web edits, and deferred changes that should only be applied at a safe boundary.
+`DetDbCommandList` is the staging surface for low-level database edits that should only be applied at a safe boundary.
 
 ```csharp
 var workers = map.GetTable("workers");
 int rowId = workers.PeekNextRowId();
 
-var batch = new DetCommandBatch();
-batch.CreateRow("workers", rowId);
-batch.SetString("workers", "name", rowId, "Somchai");
-batch.SetInt("workers", "hp", rowId, 100);
-batch.PlaceRow("units", rowId, 10, 5);
+map.PrepareNextFrame();
 
-map.Apply(batch);
+var commands = new DetDbCommandList();
+commands.CreateRow("workers", rowId);
+commands.SetString("workers", "name", rowId, "Somchai");
+commands.SetInt("workers", "hp", rowId, 100);
+commands.PlaceRow("units", rowId, 10, 5);
+
+DetDbCommandApplier.ApplyToPreparedNextFrame(map, commands);
+map.CommitNextFrame();
 ```
 
 This pattern is useful because:
 
 - row creation stays deterministic
 - writes are explicit and ordered
+- writes land on the prepared next frame, not on current state
 - future tools can stage edits without mutating live state immediately
-- the same batch can become the basis for lockstep replay later
+- the same list can become the basis for lockstep replay later
+
+Recommended mental model:
+
+- read from `current`
+- prepare `next`
+- apply `DetDbCommandList` to `next`
+- commit `next`
+
+If you want the convenience version, `DetDbCommandApplier.ApplyFrame(map, commands)` prepares, applies, and commits in one call.
 
 The first command surface intentionally focuses on database truth:
 
@@ -420,7 +465,7 @@ The first command surface intentionally focuses on database truth:
 
 `DetPathStore` is not part of the first command surface because path data is usually derived runtime state, not player intent.
 
-If the first inspector is snapshot-only, you do not need command batches yet for that tool.
+If the first inspector is snapshot-only, you do not need persisted DB command lists yet for that tool.
 
 They are included now because they belong to the core deterministic model and will matter once staged editing is introduced.
 
@@ -499,35 +544,35 @@ bool unreachable = !path.IsValid;
 
 ---
 
-## Building System
+## Spatial Placement
 
 ```csharp
-using DetMap.Building;
+using DetMap.Spatial;
 
-// Define building footprint
-var house  = new BuildingDefinition("house",  w: 2, h: 2, buildingTypeId: 1);
-var market = new BuildingDefinition("market", w: 3, h: 2, buildingTypeId: 2);
+// Define footprint
+var house  = new SpatialDefinition("house",  width: 2, height: 2, typeId: 1);
+var market = new SpatialDefinition("market", width: 3, height: 2, typeId: 2);
 
 // L-shaped footprint
-var lDef = new BuildingDefinition("Ltower", 4, 4, 3,
-    mask: BuildingDefinition.CreateLShapeMask(4, 4));
+var lDef = new SpatialDefinition("Ltower", 4, 4, 3,
+    footprintMask: SpatialDefinition.CreateLShapeMask(4, 4));
 
-DetValueLayer<int> buildingLayer = map.Grid.GetIntLayer("building");
-DetBitLayer        walkable      = map.Grid.GetBitLayer("walkable");
+DetValueLayer<int> placementLayer = map.Grid.GetIntLayer("placements");
+DetBitLayer        walkable       = map.Grid.GetBitLayer("walkable");
 
 // Check placement validity before placing
-bool ok = BuildingPlacer.CanPlace(map.Grid, ox: 10, oy: 5, house, buildingLayer, walkable);
+bool ok = SpatialPlacer.CanPlace(map.Grid, ox: 10, oy: 5, house, placementLayer, walkable);
 
-// Place (writes building ID into buildingLayer, marks cells non-walkable)
+// Place (writes type ID into placementLayer, marks cells non-walkable)
 if (ok)
-    BuildingPlacer.Place(map.Grid, 10, 5, house, buildingLayer, walkable);
+    SpatialPlacer.Place(map.Grid, 10, 5, house, placementLayer, walkable);
 
-// Remove (clears building ID, restores walkability for solid cells)
-BuildingPlacer.Remove(map.Grid, 10, 5, house, buildingLayer, walkable);
+// Remove (clears placement layer, restores walkability for solid cells)
+SpatialPlacer.Remove(map.Grid, 10, 5, house, placementLayer, walkable);
 
 // CanPlace with extra condition (e.g. must be on flat terrain)
 DetValueLayer<Fix64> height = map.Grid.GetFix64Layer("height");
-bool canBuild = BuildingPlacer.CanPlace(map.Grid, 10, 5, house, buildingLayer, walkable,
+bool canBuild = SpatialPlacer.CanPlace(map.Grid, 10, 5, house, placementLayer, walkable,
     extraCheck: (grid, x, y) => height.Get(x, y).RawValue == 0);
 ```
 
@@ -535,7 +580,7 @@ bool canBuild = BuildingPlacer.CanPlace(map.Grid, 10, 5, house, buildingLayer, w
 
 ## Query Engine
 
-All queries write results into a caller-supplied `CellHit[]` buffer — zero allocation during gameplay.
+All queries write results into a caller-supplied `CellHit[]` buffer. `RectQuery` and `RadiusQuery` are allocation-free; `FloodFill` currently uses internal queue/visited state.
 
 ```csharp
 using DetMap.Query;
@@ -575,7 +620,7 @@ int k = QueryEngine.FloodFill(
 
 ## Save / Load (DetSnapshot)
 
-`DetSnapshot.Serialize` writes a self-contained binary file. The schema (layer names, types, table columns, global keys) is embedded in the file header — no external config needed to load.
+`DetSnapshot.Serialize` writes a self-contained binary file. The schema (layer names, types, table columns, derived-column metadata, global keys) is embedded in the file header — no external config needed to load.
 
 This makes `DetSnapshot` a good boundary format for an offline inspector: the game saves a snapshot, and a separate HTML tool reads that file and renders the database.
 
@@ -596,7 +641,7 @@ DetSpatialDatabase restored = DetSnapshot.Deserialize(bytes);
 ulong tick = loaded.Tick;
 Fix64 gold = loaded.GetGlobal("treasury");
 
-DetValueLayer<int> ids  = loaded.Grid.GetIntLayer("building");
+DetValueLayer<int> placements = loaded.Grid.GetIntLayer("placements");
 DetBitLayer        walk = loaded.Grid.GetBitLayer("walkable");
 DetCellIndex       u    = loaded.Grid.GetCellIndex("units");
 DetTagLayer        svc  = loaded.Grid.GetTagLayer("services");
@@ -612,7 +657,7 @@ Fix64     xp    = chars.GetFix64Column("xp").Get(0);
 
 ```text
 [4 bytes]  magic: 'D','M','A','P'
-[2 bytes]  version: 2
+[2 bytes]  version: 5
 ── SCHEMA ─────────────────────────────────────
 [4]  grid width
 [4]  grid height
@@ -620,7 +665,9 @@ Fix64     xp    = chars.GetFix64Column("xp").Get(0);
      per layer: [1] kind  [str] name
 [4]  table count
      per table: [str] name  [4] colCount
-       per col: [1] kind  [str] name
+       per col: [1] kind  [str] name  [1] isDerived  [1] isEditable  [str] source
+[4]    indexCount
+       per index: [1] kind  [str] name  [str] columnName
 [4]  global count  (keys in ordinal-sorted order)
      per global: [str] key
 [4]  pathstore count
@@ -632,9 +679,11 @@ Fix64     xp    = chars.GetFix64Column("xp").Get(0);
      per table: [4] highWater  [4] freeCount  freeList[]
                 alive col data  user col data × colCount
      pathstore data × P
+     [1] hasFrameRecord
+         if true: frame summary + db commands
 ```
 
-**What is saved:** layers, globals, tables, path stores, tick.
+**What is saved:** layers, globals, tables, table indexes, path stores, tick, and optional frame command records.
 
 ---
 
@@ -680,236 +729,51 @@ DetMap targets `netstandard2.1` and uses only APIs available in Unity (Mono / IL
 Typical Unity setup pattern:
 
 ```csharp
-// MonoBehaviour bootstrap — runs once
 void Awake()
 {
-    _map = new DetSpatialDatabase(64, 64);
+    _map = new DetSpatialDatabase(64, 64); // hidden 3-frame ring pool by default
 
-    _buildingLayer = _map.Grid.CreateIntLayer("building");
-    _walkable      = _map.Grid.CreateBitLayer("walkable");
-    _units         = _map.Grid.CreateCellIndex("units");
-
+    _walkable = _map.Grid.CreateBitLayer("walkable");
     _walkable.SetAll(true);
 
-    _table   = _map.CreateTable("units");
-    _nameCol = _table.CreateStringColumn("name");
-    _hpCol   = _table.CreateIntColumn("hp");
-
-    _pathfinder = new DetPathfinder(64, 64);
-    _paths      = _map.CreatePathStore("unitPaths");
+    _units = _map.CreateTable("units");
+    _posX = _units.CreateIntColumn("posX");
+    _posY = _units.CreateIntColumn("posY");
+    _unitsByCell = _map.Grid.CreateCellIndex("unitsByCell");
 }
 
-// Per-tick update — call from FixedUpdate or a lockstep loop
 void SimulateTick()
 {
-    _map.AdvanceTick();
+    _map.PrepareNextFrame();
+    var commands = new DetDbCommandList();
 
-    foreach (int id in _table.GetRowIds())
+    foreach (int id in _units.GetRowIds())
     {
-        ref DetPath p = ref _paths.Get(id);
-        if (!p.IsValid || p.IsComplete) continue;
+        int x = _posX.Get(id);
+        int y = _posY.Get(id);
+        int nx = x + 1;
 
-        p.Advance();
-        var (nx, ny) = p.Current(64);
-        _units.MoveTo(id, nx, ny);
+        commands.SetInt("units", "posX", id, nx);
+        commands.MoveRow("unitsByCell", id, nx, y);
     }
 
-    // Dirty rects tell the renderer exactly which cells changed
-    DirtyRect changed = _buildingLayer.Dirty;
-    if (changed.IsDirty)
-    {
-        RefreshTiles(changed);
-        _buildingLayer.ClearDirty();
-    }
+    DetDbCommandApplier.ApplyToPreparedNextFrame(_map, commands);
+    _map.CommitNextFrame();
 }
 ```
 
-### Random Walkers Example
+### Maintained Sample
 
-The example below creates 10 workers. Each worker keeps walking to a random destination, and only after reaching that destination does it pick a new one.
+The maintained end-to-end sample is now the settlement demo at
+[`samples/DetMap.RandomWalkDemo/Program.cs`](samples/DetMap.RandomWalkDemo/Program.cs).
+It demonstrates:
 
-```csharp
-using System.Collections.Generic;
-using DetMap.Core;
-using DetMap.Layers;
-using DetMap.Pathfinding;
-using DetMap.Tables;
-using UnityEngine;
+- current-frame reads with next-frame writes
+- `DetDbCommandList` staging and `DetDbCommandApplier`
+- table indexes and spatial indexes together
+- saved `.dmap` snapshots with persisted frame command records
 
-public sealed class RandomWalkerExample : MonoBehaviour
-{
-    [SerializeField] private GameObject workerPrefab;
-    [SerializeField] private int mapWidth = 32;
-    [SerializeField] private int mapHeight = 32;
-    [SerializeField] private int workerCount = 10;
-    [SerializeField] private float cellSize = 1f;
-    [SerializeField] private uint randomSeed = 123456789;
-
-    private DetSpatialDatabase _map = null!;
-    private DetBitLayer _walkable = null!;
-    private DetCellIndex _units = null!;
-    private DetTable _workers = null!;
-    private DetStringColumn _nameColumn = null!;
-    private DetColumn<int> _posXColumn = null!;
-    private DetColumn<int> _posYColumn = null!;
-    private DetPathStore _paths = null!;
-    private DetPathfinder _pathfinder = null!;
-
-    private readonly Dictionary<int, Transform> _views = new();
-    private uint _rngState;
-
-    private void Awake()
-    {
-        _rngState = randomSeed;
-
-        _map = new DetSpatialDatabase(mapWidth, mapHeight);
-        _walkable = _map.Grid.CreateBitLayer("walkable");
-        _walkable.SetAll(true);
-
-        _units = _map.Grid.CreateCellIndex("units");
-
-        _workers = _map.CreateTable("workers");
-        _nameColumn = _workers.CreateStringColumn("name");
-        _posXColumn = _workers.CreateIntColumn("posX");
-        _posYColumn = _workers.CreateIntColumn("posY");
-
-        _paths = _map.CreatePathStore("workerPaths");
-        _pathfinder = new DetPathfinder(mapWidth, mapHeight);
-    }
-
-    private void Start()
-    {
-        for (int i = 0; i < workerCount; i++)
-        {
-            var (x, y) = FindRandomWalkableCell();
-            int id = SpawnWorker($"Worker_{i}", x, y);
-            AssignRandomDestination(id);
-        }
-
-        SyncViews();
-    }
-
-    private void FixedUpdate()
-    {
-        SimulateTick();
-        SyncViews();
-    }
-
-    private int SpawnWorker(string workerName, int x, int y)
-    {
-        int id = _workers.CreateRow();
-
-        _nameColumn.Set(id, workerName);
-        _posXColumn.Set(id, x);
-        _posYColumn.Set(id, y);
-        _units.Place(id, x, y);
-
-        if (workerPrefab != null)
-        {
-            var view = Instantiate(workerPrefab, GridToWorld(x, y), Quaternion.identity, transform);
-            view.name = workerName;
-            _views[id] = view.transform;
-        }
-
-        return id;
-    }
-
-    private void SimulateTick()
-    {
-        foreach (int id in _workers.GetRowIds())
-        {
-            ref DetPath path = ref _paths.Get(id);
-
-            if (!path.IsValid)
-            {
-                AssignRandomDestination(id);
-                continue;
-            }
-
-            if (!path.IsComplete)
-            {
-                path.Advance();
-                var (nx, ny) = path.Current(mapWidth);
-
-                _units.MoveTo(id, nx, ny);
-                _posXColumn.Set(id, nx);
-                _posYColumn.Set(id, ny);
-            }
-
-            if (path.IsComplete)
-                AssignRandomDestination(id);
-        }
-
-        _map.AdvanceTick();
-    }
-
-    private void AssignRandomDestination(int workerId)
-    {
-        int startX = _posXColumn.Get(workerId);
-        int startY = _posYColumn.Get(workerId);
-
-        for (int attempt = 0; attempt < 64; attempt++)
-        {
-            int goalX = NextInt(mapWidth);
-            int goalY = NextInt(mapHeight);
-
-            if (!_walkable.Get(goalX, goalY))
-                continue;
-
-            if (goalX == startX && goalY == startY)
-                continue;
-
-            DetPath path = _pathfinder.FindPath(startX, startY, goalX, goalY, _walkable);
-            if (!path.IsValid)
-                continue;
-
-            _paths.Set(workerId, path);
-            return;
-        }
-
-        _paths.Clear(workerId);
-    }
-
-    private (int x, int y) FindRandomWalkableCell()
-    {
-        for (int attempt = 0; attempt < 64; attempt++)
-        {
-            int x = NextInt(mapWidth);
-            int y = NextInt(mapHeight);
-            if (_walkable.Get(x, y))
-                return (x, y);
-        }
-
-        return (0, 0);
-    }
-
-    private void SyncViews()
-    {
-        foreach (int id in _workers.GetRowIds())
-        {
-            if (!_views.TryGetValue(id, out Transform view))
-                continue;
-
-            int x = _posXColumn.Get(id);
-            int y = _posYColumn.Get(id);
-            view.position = GridToWorld(x, y);
-        }
-    }
-
-    private Vector3 GridToWorld(int x, int y)
-        => new Vector3(x * cellSize, 0f, y * cellSize);
-
-    private int NextInt(int maxExclusive)
-    {
-        _rngState ^= _rngState << 13;
-        _rngState ^= _rngState >> 17;
-        _rngState ^= _rngState << 5;
-        return (int)(_rngState % (uint)maxExclusive);
-    }
-}
-```
-
-If you need strict lockstep determinism, keep the RNG state in simulation state rather than only on the `MonoBehaviour`.
+If you need strict lockstep determinism, keep RNG state inside simulation state rather than only on the `MonoBehaviour`.
 
 ---
 
@@ -918,13 +782,21 @@ If you need strict lockstep determinism, keep the RNG state in simulation state 
 ### DetSpatialDatabase — Root State
 
 ```csharp
-new DetSpatialDatabase(int width, int height)
+new DetSpatialDatabase(int width, int height, int frameCount = 3)
 map.Grid                                 // DetGrid
 map.Tick                                 // ulong
-map.AdvanceTick()
+map.FrameCount                           // int
+map.CurrentFrameIndex                    // int
+map.NextFrameIndex                       // int?
+map.HasNextFrame                         // bool
+map.NextFrame                            // DetSpatialDatabase?
+map.PrepareNextFrame()                   // copies current into pooled next slot and advances tick there
+map.GetNextFrame()                       // prepared next frame
+map.CommitNextFrame()                    // makes prepared next frame current
+map.DiscardNextFrame()
+map.AdvanceFrame()                       // prepare + commit, useful when no staged writes are needed
 map.SetGlobal(string key, Fix64 value)
 Fix64 map.GetGlobal(string key)          // returns Zero if missing
-map.Apply(DetCommandBatch batch)
 map.Globals                              // IReadOnlyDictionary<string, Fix64>
 DetTable     map.CreateTable(string name, int capacity = 256)
 DetTable     map.GetTable(string name)
@@ -1022,11 +894,11 @@ DetFlowLayer.Blocked = 255
 int  table.CreateRow()
 void table.DeleteRow(int id)
 bool table.RowExists(int id)
-DetColumn<byte> table.CreateByteColumn(string name)
-DetColumn<int>  table.CreateIntColumn(string name)
-DetColumn<Fix64> table.CreateFix64Column(string name)
-DetColumn<T>    table.CreateColumn<T>(string name, DetType<T> type)  // low-level generic factory
-DetStringColumn table.CreateStringColumn(string name)
+DetColumn<byte> table.CreateByteColumn(string name, DetColumnOptions? options)
+DetColumn<int>  table.CreateIntColumn(string name, DetColumnOptions? options)
+DetColumn<Fix64> table.CreateFix64Column(string name, DetColumnOptions? options)
+DetColumn<T>    table.CreateColumn<T>(string name, DetType<T> type, DetColumnOptions? options)  // low-level generic factory
+DetStringColumn table.CreateStringColumn(string name, DetColumnOptions? options)
 DetColumn<byte> table.GetByteColumn(string name)
 DetColumn<int>  table.GetIntColumn(string name)
 DetColumn<Fix64> table.GetFix64Column(string name)
@@ -1035,6 +907,7 @@ DetStringColumn table.GetStringColumn(string name)
 IEnumerable<int> table.GetRowIds()        // 0..HighWater, existing rows only
 int table.HighWater
 DetTableSchema table.GetSchema()
+DetColumnSchema table.GetColumnSchema(string name)
 int table.PeekNextRowId()
 ```
 
@@ -1046,10 +919,10 @@ ref DetPath store.Get(int rowId)      // ref — modify in-place
 store.Clear(int rowId)
 ```
 
-### DetCommandBatch
+### DetDbCommandList
 
 ```csharp
-new DetCommandBatch()
+new DetDbCommandList()
 batch.SetGlobal(string key, Fix64 value)
 batch.CreateRow(string tableName, int expectedRowId)
 batch.DeleteRow(string tableName, int rowId)
@@ -1064,9 +937,16 @@ batch.SetFix64Cell(string layerName, int x, int y, Fix64 value)
 batch.PlaceRow(string indexName, int rowId, int x, int y)
 batch.MoveRow(string indexName, int rowId, int x, int y)
 batch.RemoveRow(string indexName, int rowId)
-batch.ApplyTo(DetSpatialDatabase database)
 batch.Clear()
 batch.Count
+```
+
+### DetDbCommandApplier
+
+```csharp
+DetDbCommandApplier.ApplyFrame(DetSpatialDatabase database, DetDbCommandList commandList)
+DetDbCommandApplier.ApplyToNextFrame(DetSpatialDatabase database, DetDbCommandList commandList)
+DetDbCommandApplier.ApplyToPreparedNextFrame(DetSpatialDatabase database, DetDbCommandList commandList)
 ```
 
 ### DetPathfinder / DetPath
@@ -1098,7 +978,7 @@ int QueryEngine.FloodFill(grid, startX, startY, canSpread, CellHit[] buffer)
 ### DetSnapshot
 
 ```csharp
-byte[] DetSnapshot.Serialize(DetSpatialDatabase database)
+byte[] DetSnapshot.Serialize(DetSpatialDatabase database, DetDbFrameRecord? frameRecord = null)
 DetSpatialDatabase DetSnapshot.Deserialize(byte[] data)   // throws InvalidDataException on bad magic/version
 // Also accessible via: map.ToBytes() / DetSpatialDatabase.FromBytes(data)
 ```

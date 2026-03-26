@@ -1,6 +1,7 @@
 using DetMap.Core;
 using DetMap.Schema;
 using DetMap.Tables;
+using DetMath;
 
 namespace DetMap.Tests.Tables;
 
@@ -61,6 +62,48 @@ public class DetTableTests
         int id = table.CreateRow();
         nameCol.Set(id, "Somchai");
         Assert.Equal("Somchai", nameCol.Get(id));
+    }
+
+    [Fact]
+    public void DeleteRow_ClearsColumnValues()
+    {
+        var table = new DetTable("chars");
+        var jobCol = table.CreateByteColumn("job");
+        var hpCol = table.CreateIntColumn("hp");
+        var nameCol = table.CreateStringColumn("name");
+
+        int id = table.CreateRow();
+        jobCol.Set(id, 3);
+        hpCol.Set(id, 120);
+        nameCol.Set(id, "Somchai");
+
+        table.DeleteRow(id);
+
+        Assert.Equal(0, jobCol.Get(id));
+        Assert.Equal(0, hpCol.Get(id));
+        Assert.Null(nameCol.Get(id));
+    }
+
+    [Fact]
+    public void RecycledRow_StartsCleanWithoutLeakingOldValues()
+    {
+        var table = new DetTable("chars");
+        var jobCol = table.CreateByteColumn("job");
+        var hpCol = table.CreateIntColumn("hp");
+        var nameCol = table.CreateStringColumn("name");
+
+        int id = table.CreateRow();
+        jobCol.Set(id, 7);
+        hpCol.Set(id, 250);
+        nameCol.Set(id, "Old Name");
+
+        table.DeleteRow(id);
+        int recycled = table.CreateRow();
+
+        Assert.Equal(id, recycled);
+        Assert.Equal(0, jobCol.Get(recycled));
+        Assert.Equal(0, hpCol.Get(recycled));
+        Assert.Null(nameCol.Get(recycled));
     }
 
     [Fact]
@@ -183,5 +226,125 @@ public class DetTableTests
         Assert.Equal(DetColumnKind.Byte, schema.Columns[1].Kind);
         Assert.Equal("hp", schema.Columns[2].Name);
         Assert.Equal(DetColumnKind.Int, schema.Columns[2].Kind);
+    }
+
+    [Fact]
+    public void ByteIndex_TracksAliveRowsByColumnValue()
+    {
+        var table = new DetTable("units");
+        var role = table.CreateByteColumn("role");
+        var unitsByRole = table.CreateByteIndex("unitsByRole", role);
+
+        int worker = table.CreateRow();
+        int builder = table.CreateRow();
+
+        role.Set(worker, 1);
+        role.Set(builder, 2);
+
+        Assert.Equal(new[] { worker }, unitsByRole.GetRowIds(1).ToArray());
+        Assert.Equal(new[] { builder }, unitsByRole.GetRowIds(2).ToArray());
+
+        role.Set(worker, 2);
+
+        Assert.Empty(unitsByRole.GetRowIds(1));
+        Assert.Equal(new[] { worker, builder }, unitsByRole.GetRowIds(2).ToArray());
+    }
+
+    [Fact]
+    public void DeleteRow_RemovesRowFromColumnIndex()
+    {
+        var table = new DetTable("units");
+        var role = table.CreateByteColumn("role");
+        var unitsByRole = table.CreateByteIndex("unitsByRole", role);
+
+        int rowId = table.CreateRow();
+        role.Set(rowId, 3);
+
+        Assert.True(unitsByRole.Contains(3, rowId));
+
+        table.DeleteRow(rowId);
+
+        Assert.False(unitsByRole.Contains(3, rowId));
+        Assert.Equal(0, unitsByRole.Count(3));
+    }
+
+    [Fact]
+    public void CreateColumnIndex_AfterRowsExist_IndexesCurrentAliveRows()
+    {
+        var table = new DetTable("units");
+        var job = table.CreateIntColumn("job");
+
+        int a = table.CreateRow();
+        int b = table.CreateRow();
+        int c = table.CreateRow();
+        job.Set(a, 10);
+        job.Set(b, 20);
+        job.Set(c, 10);
+        table.DeleteRow(b);
+
+        var unitsByJob = table.CreateIntIndex("unitsByJob", job);
+
+        Assert.Equal(new[] { a, c }, unitsByJob.GetRowIds(10).ToArray());
+        Assert.Empty(unitsByJob.GetRowIds(20));
+    }
+
+    [Fact]
+    public void RecycledRow_RejoinsColumnIndexWithCleanDefaultValue()
+    {
+        var table = new DetTable("units");
+        var role = table.CreateByteColumn("role");
+        var unitsByRole = table.CreateByteIndex("unitsByRole", role);
+
+        int rowId = table.CreateRow();
+        role.Set(rowId, 9);
+        table.DeleteRow(rowId);
+
+        int recycled = table.CreateRow();
+
+        Assert.Equal(rowId, recycled);
+        Assert.False(unitsByRole.Contains(9, recycled));
+        Assert.True(unitsByRole.Contains(0, recycled));
+
+        role.Set(recycled, 4);
+
+        Assert.False(unitsByRole.Contains(0, recycled));
+        Assert.True(unitsByRole.Contains(4, recycled));
+    }
+
+    [Fact]
+    public void GetSchema_IncludesDerivedColumnMetadata()
+    {
+        var table = new DetTable("spatialDefinitions");
+        table.CreateStringColumn("layoutText");
+        table.CreateStringColumn("layoutPreview", DetColumnOptions.Derived("layoutText"));
+
+        DetTableSchema schema = table.GetSchema();
+
+        Assert.Equal(2, schema.Columns.Count);
+        Assert.False(schema.Columns[0].IsDerived);
+        Assert.True(schema.Columns[1].IsDerived);
+        Assert.Equal("layoutText", schema.Columns[1].Source);
+        Assert.False(schema.Columns[1].IsEditable);
+    }
+
+    [Fact]
+    public void GetSchema_IncludesColumnIndexes()
+    {
+        var table = new DetTable("units");
+        var role = table.CreateByteColumn("role");
+        var home = table.CreateIntColumn("homeId");
+
+        table.CreateByteIndex("unitsByRole", role);
+        table.CreateIntIndex("unitsByHome", home);
+
+        DetTableSchema schema = table.GetSchema();
+
+        Assert.Equal(2, schema.Indexes.Count);
+        Assert.Equal("unitsByRole", schema.Indexes[0].Name);
+        Assert.Equal(DetColumnKind.Byte, schema.Indexes[0].Kind);
+        Assert.Equal("role", schema.Indexes[0].ColumnName);
+        Assert.Equal("unitsByHome", schema.Indexes[1].Name);
+        Assert.Equal(DetColumnKind.Int, schema.Indexes[1].Kind);
+        Assert.Equal("homeId", schema.Indexes[1].ColumnName);
     }
 }

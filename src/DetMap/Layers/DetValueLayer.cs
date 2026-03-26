@@ -42,6 +42,15 @@ public sealed class DetValueLayer<T> : IDetLayer, IDetReadable<T> where T : unma
 
     public void Fill(T value) => Array.Fill(_data, value);
 
+    public void CopyFrom(DetValueLayer<T> source)
+    {
+        if (source._width != _width || source._height != _height)
+            throw new InvalidOperationException($"Cannot copy layer '{source.Name}' into '{Name}' with different dimensions.");
+
+        source._data.AsSpan().CopyTo(_data);
+        Dirty = default;
+    }
+
     public Span<T> AsSpan() => _data.AsSpan();
 
     public void ClearDirty()

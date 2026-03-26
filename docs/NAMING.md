@@ -30,7 +30,7 @@ Examples:
 - `Index`
 - `Store`
 - `Snapshot`
-- `CommandBatch`
+- `DbCommandList`
 
 ### 2. Use spatial words only where space actually matters
 
@@ -174,13 +174,13 @@ Canonical type:
 
 - `DetSnapshot`
 
-### `CommandBatch`
+### `DbCommandList`
 
-`CommandBatch` means an ordered set of deferred mutations that can be applied at a safe simulation boundary.
+`DbCommandList` means an ordered set of deferred database mutations that can be applied at a safe simulation boundary.
 
 Canonical type:
 
-- `DetCommandBatch`
+- `DetDbCommandList`
 
 ### `Definition`
 
@@ -188,7 +188,7 @@ Canonical type:
 
 Canonical type:
 
-- `BuildingDefinition`
+- `SpatialDefinition`
 
 Do not use `Def` in public API.
 
@@ -200,7 +200,7 @@ Good:
 
 - `new DetSpatialDatabase(width, height)`
 - `DetSpatialDatabase.FromBytes(data)`
-- `database.Apply(batch)`
+- `DetDbCommandApplier.ApplyFrame(database, commandList)`
 
 Avoid:
 
@@ -276,7 +276,7 @@ Good:
 
 - `DetSnapshot.Serialize(database)`
 - `DetSnapshot.Deserialize(data)`
-- `DetCommandBatch`
+- `DetDbCommandList`
 
 Avoid:
 
@@ -326,7 +326,7 @@ DetMap public naming should read like a spatial database:
 - `DetCellIndex`
 - `DetPathStore`
 - `DetSnapshot`
-- `DetCommandBatch`
+- `DetDbCommandList`
 
 The main rule is simple:
 

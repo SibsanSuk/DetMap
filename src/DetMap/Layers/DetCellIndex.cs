@@ -80,6 +80,26 @@ public sealed class DetCellIndex : IDetLayer, IDetSpatial
 
     public int CountAt(int x, int y) => _countCache.Get(x, y);
 
+    public void CopyFrom(DetCellIndex source)
+    {
+        if (source._width != _width || source._height != _height)
+            throw new InvalidOperationException($"Cannot copy index '{source.Name}' into '{Name}' with different dimensions.");
+
+        if (_cellOf.Length != source._cellOf.Length)
+            _cellOf = new int[source._cellOf.Length];
+        if (_next.Length != source._next.Length)
+            _next = new int[source._next.Length];
+
+        Array.Copy(source._cellOf, _cellOf, source._cellOf.Length);
+        Array.Copy(source._next, _next, source._next.Length);
+
+        _heads.Clear();
+        foreach (var kv in source._heads)
+            _heads[kv.Key] = kv.Value;
+
+        _countCache.CopyFrom(source._countCache);
+    }
+
     public RowIdEnumerator GetRowIdsAt(int x, int y)
     {
         int cell = CellKey(x, y);

@@ -1,5 +1,7 @@
 namespace DetMap.Core;
 
+public delegate bool DetCellPredicate(DetGrid grid, int x, int y);
+
 public enum DetLayerKind : byte
 {
     ValueByte = 0,
