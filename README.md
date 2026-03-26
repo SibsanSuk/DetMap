@@ -24,6 +24,7 @@ Simulation math uses **Fix64** fixed-point arithmetic, and database values are r
   - [DetFlowLayer — direction + cost grid](#detflowlayer--direction--cost-grid)
 - [Tables](#tables)
   - [DetTable — column-oriented row store](#dettable--column-oriented-row-store)
+  - [DetColumnIndex\<T\> — field/group index](#detcolumnindext--fieldgroup-index)
 - [DetPathStore — path store](#detpathstore--path-store)
 - [Pathfinding](#pathfinding)
 - [Spatial Placement](#spatial-placement)
@@ -55,6 +56,7 @@ Use this rule of thumb:
 - `Table`: sparse rows you want humans and systems to inspect. Examples: `units`, `buildings`, `resourceStacks`, `jobs`.
 - `Derived Column`: readable summary data generated from truth tables/columns. Examples: `storageSummary`, `layoutPreview`, `taskLabel`.
 - `CellIndex`: spatial lookup for table rows. Example: “which unit rows are in cell `(10,5)`?”
+- `ColumnIndex`: grouped lookup for table rows by field value. Example: “which unit rows have `role == Builder`?”
 - `PathStore`: derived movement payload keyed by row id. Example: the current A* path for a worker.
 - `DetSnapshot`: save/load boundary for debugging, replay, and offline inspection.
 
@@ -63,6 +65,7 @@ Typical modeling pattern:
 - Keep business truth in `Table` columns and `Layer` values.
 - Add derived columns when users need one table to read clearly without opening several related tables.
 - Add `CellIndex` when you need fast row-by-cell lookup.
+- Add `ColumnIndex` when you need fast row-by-field grouping.
 - Use `PathStore` for runtime path payload, not as your main business record.
 
 ---
@@ -80,7 +83,8 @@ DetSpatialDatabase           ← top-level state database (tick, globals, tables
 
 DetTable                     ← column-oriented row store
   ├── DetColumn<T>              ← typed value column (byte / int / Fix64)
-  └── DetStringColumn           ← string column
+  ├── DetStringColumn           ← string column
+  └── DetColumnIndex<T>         ← field/group index for byte / int / Fix64 columns
 
 DetPathStore                 ← named path store (rowId → DetPath), serialized by DetSnapshot
 
@@ -391,6 +395,47 @@ DetStringColumn storageSummary = chars.CreateStringColumn(
 ```
 
 Use this for reading surfaces, not for source-of-truth state. Systems should update the source tables and regenerate the derived column.
+
+---
+
+### DetColumnIndex\<T\> — field/group index
+
+Use a column index when you need fast grouping by a table field value rather than by grid cell.
+
+```csharp
+DetTable units = map.CreateTable("units");
+
+DetColumn<byte> roleCol = units.CreateByteColumn("role");
+DetColumn<int> homeCol = units.CreateIntColumn("homeBuildingId");
+
+DetColumnIndex<byte> unitsByRole = units.CreateByteIndex("unitsByRole", roleCol);
+DetColumnIndex<int> unitsByHome = units.CreateIntIndex("unitsByHome", homeCol);
+
+int a = units.CreateRow();
+roleCol.Set(a, 1);
+homeCol.Set(a, 100);
+
+int b = units.CreateRow();
+roleCol.Set(b, 2);
+homeCol.Set(b, 100);
+
+int idleCount = unitsByRole.Count(1);
+bool contains = unitsByHome.Contains(100, a);
+
+foreach (int rowId in unitsByHome.GetRowIds(100))
+{
+    // rows grouped under homeBuildingId == 100
+}
+```
+
+Behavior:
+
+- indexes are opt-in; create them only for columns you want grouped lookup on
+- after an index exists, `CreateRow()`, `DeleteRow()`, and `column.Set(...)` keep it updated automatically
+- supported indexed column kinds are `byte`, `int`, and `Fix64`
+- snapshot save/load persists index schema and rebuilds contents from live rows
+
+Use `CellIndex` for spatial lookup and `DetColumnIndex<T>` for field/value grouping.
 
 ---
 
@@ -899,16 +944,35 @@ DetColumn<int>  table.CreateIntColumn(string name, DetColumnOptions? options)
 DetColumn<Fix64> table.CreateFix64Column(string name, DetColumnOptions? options)
 DetColumn<T>    table.CreateColumn<T>(string name, DetType<T> type, DetColumnOptions? options)  // low-level generic factory
 DetStringColumn table.CreateStringColumn(string name, DetColumnOptions? options)
+DetColumnIndex<byte> table.CreateByteIndex(string name, DetColumn<byte> column)
+DetColumnIndex<int> table.CreateIntIndex(string name, DetColumn<int> column)
+DetColumnIndex<Fix64> table.CreateFix64Index(string name, DetColumn<Fix64> column)
 DetColumn<byte> table.GetByteColumn(string name)
 DetColumn<int>  table.GetIntColumn(string name)
 DetColumn<Fix64> table.GetFix64Column(string name)
 DetColumn<T>    table.GetColumn<T>(string name)                      // low-level generic getter
 DetStringColumn table.GetStringColumn(string name)
+DetColumnIndex<byte> table.GetByteIndex(string name)
+DetColumnIndex<int> table.GetIntIndex(string name)
+DetColumnIndex<Fix64> table.GetFix64Index(string name)
 IEnumerable<int> table.GetRowIds()        // 0..HighWater, existing rows only
 int table.HighWater
 DetTableSchema table.GetSchema()
 DetColumnSchema table.GetColumnSchema(string name)
+DetColumnIndexSchema table.GetIndexSchema(string name)
+table.IndexOrder
 int table.PeekNextRowId()
+```
+
+### DetColumnIndex\<T\>
+
+```csharp
+index.Count(T key) -> int
+index.Contains(T key, int rowId) -> bool
+IEnumerable<int> index.GetRowIds(T key)
+index.Name
+index.ColumnName
+index.Kind
 ```
 
 ### DetPathStore
