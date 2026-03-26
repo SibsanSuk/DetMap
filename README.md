@@ -11,11 +11,14 @@ Simulation math uses **Fix64** fixed-point arithmetic, and database values are r
 ## Table of Contents
 
 - [Why DetMap](#why-detmap)
+- [Visualize It](#visualize-it)
 - [Modeling Data](#modeling-data)
 - [Architecture](#architecture)
+- [Typical Frame Loop](#typical-frame-loop)
 - [Data Schema](#data-schema)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [For AI / Codegen](#for-ai--codegen)
 - [Layers](#layers)
   - [DetValueLayer\<T\> — dense value grid](#detvaluelayert--dense-value-grid)
   - [DetBitLayer — packed booleans](#detbitlayer--packed-booleans)
@@ -45,6 +48,28 @@ Simulation math uses **Fix64** fixed-point arithmetic, and database values are r
 - **Designed for large state.** Dense per-cell data goes into layers; sparse gameplay records go into tables.
 
 If your main pain is “the game has too much state to reason about in the editor,” DetMap is aimed at that problem first.
+
+---
+
+## Visualize It
+
+Think about one settlement tick in concrete terms:
+
+- the ground is stored in layers such as `height`, `terrainType`, `walkable`, and `fertility`
+- the actors are stored in tables such as `units`, `buildings`, `jobs`, and `resourceNodes`
+- spatial questions use indexes such as `unitsByCell`
+- grouped questions use column indexes such as `unitsByRole`
+- path data sits beside the main state in `DetPathStore`
+- each tick reads the current frame, writes the next frame, commits, and can save a `.dmap` snapshot for inspection
+
+That means a bug like “builders stopped moving after materials arrived” becomes inspectable:
+
+- open the `units` table and see each worker's `role`, `state`, `task`, and destination
+- open the `buildings` table and see delivered materials vs required work
+- open the `unitsByCell` spatial index to see where rows are on the map
+- save the frame and inspect it offline in the HTML viewer
+
+DetMap is for projects where you want to look at the world as data instead of guessing through scene objects.
 
 ---
 
@@ -97,6 +122,34 @@ DetSnapshot                  ← binary save/load with embedded schema
 DetMap now runs on a `current frame -> next frame -> commit` model inside `DetSpatialDatabase`.
 The frame pool is internal. Callers still use one database object and stage edits through `DetDbCommandList`.
 
+---
+
+## Typical Frame Loop
+
+The intended way to use DetMap at runtime is:
+
+1. Read current state from `DetSpatialDatabase`
+2. Call `PrepareNextFrame()`
+3. Build a `DetDbCommandList` for everything that should change this tick
+4. Apply that list to the prepared next frame
+5. Commit the next frame
+
+Minimal shape:
+
+```csharp
+map.PrepareNextFrame();
+
+var commands = new DetDbCommandList();
+commands.SetInt("units", "posX", rowId, nextX);
+commands.SetInt("units", "posY", rowId, nextY);
+commands.MoveRow("unitsByCell", rowId, nextX, nextY);
+
+DetDbCommandApplier.ApplyToPreparedNextFrame(map, commands);
+map.CommitNextFrame();
+```
+
+Use direct mutation mainly for setup/seed phases. Use command lists for frame-to-frame simulation.
+
 Architecture note: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 Schema note: [docs/SCHEMA.md](docs/SCHEMA.md)
 Snapshot viewer note: [docs/SNAPSHOT_VIEWER.md](docs/SNAPSHOT_VIEWER.md)
@@ -147,47 +200,81 @@ Schema note: [docs/SCHEMA.md](docs/SCHEMA.md)
 ```csharp
 using DetMath;
 using DetMap.Core;
+using DetMap.DbCommands;
 using DetMap.Layers;
 using DetMap.Tables;
 
 // 1. Create the database
 var db = new DetSpatialDatabase(64, 64);
 
-// 2. Create dense cell data
-var height   = db.Grid.CreateFix64Layer("height");
+// 2. Create dense world data
+var height = db.Grid.CreateFix64Layer("height");
 var walkable = db.Grid.CreateBitLayer("walkable");
 walkable.SetAll(true);
 
-// 3. Create sparse row data
-var units      = db.CreateTable("units");
-var unitName   = units.CreateStringColumn("name");
-var unitHp     = units.CreateIntColumn("hp");
-var unitCells  = db.Grid.CreateCellIndex("unitsByCell");
+// 3. Create sparse actor data
+var units = db.CreateTable("units");
+var unitName = units.CreateStringColumn("name");
+var unitPosX = units.CreateIntColumn("posX");
+var unitPosY = units.CreateIntColumn("posY");
+var unitRole = units.CreateByteColumn("role");
 
-// 4. Add one row
+// 4. Add indexes for common queries
+var unitsByCell = db.Grid.CreateCellIndex("unitsByCell");
+var unitsByRole = units.CreateByteIndex("unitsByRole", unitRole);
+
+// 5. Seed one unit
 int rowId = units.CreateRow();
 unitName.Set(rowId, "Alice");
-unitHp.Set(rowId, 100);
-unitCells.Place(rowId, 5, 5);
+unitPosX.Set(rowId, 5);
+unitPosY.Set(rowId, 5);
+unitRole.Set(rowId, 1); // builder
+unitsByCell.Place(rowId, 5, 5);
 height.Set(5, 5, Fix64.FromInt(2));
 
-// 5. Save a snapshot for replay or inspection
+// 6. Simulate one tick using current -> next -> commit
+db.PrepareNextFrame();
+var commands = new DetDbCommandList();
+commands.SetInt("units", "posX", rowId, 6);
+commands.SetInt("units", "posY", rowId, 5);
+commands.MoveRow("unitsByCell", rowId, 6, 5);
+DetDbCommandApplier.ApplyToPreparedNextFrame(db, commands);
+db.CommitNextFrame();
+
+// 7. Save a snapshot for replay or inspection
 byte[] snapshot = db.ToBytes();
 
-// 6. Load it back
+// 8. Load it back
 var restored = DetSpatialDatabase.FromBytes(snapshot);
-int hp = restored.GetTable("units").GetIntColumn("hp").Get(rowId);
+int x = restored.GetTable("units").GetIntColumn("posX").Get(rowId);
 bool canWalk = restored.Grid.GetBitLayer("walkable").Get(5, 5);
 ```
 
 What this shows:
 
-- `Layer` stores per-cell world data.
+- `Layer` stores world facts per cell.
 - `Table` stores inspectable row state.
-- `CellIndex` answers spatial lookup questions fast.
+- `CellIndex` and `ColumnIndex` answer common queries without scanning whole tables.
+- simulation writes go through `DetDbCommandList`
 - `DetSnapshot` is the portable save/inspect boundary.
 
 The rest of this README expands each piece in detail.
+
+---
+
+## For AI / Codegen
+
+If you are generating DetMap code with AI, keep this template in mind:
+
+- model dense world facts as layers
+- model actors and business records as tables
+- add `CellIndex` for spatial lookup
+- add `ColumnIndex` for field-based grouping
+- seed/setup may write directly
+- runtime ticks should use `PrepareNextFrame() -> DetDbCommandList -> ApplyToPreparedNextFrame() -> CommitNextFrame()`
+- save `.dmap` snapshots when you want offline inspection
+
+If an AI-generated solution starts mutating current-frame runtime state directly during simulation, it is usually going in the wrong direction.
 
 ---
 
